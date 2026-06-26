@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Учёт оплат за лёд</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --border: #2d3f56;
+      --text: #e8edf4;
+      --muted: #8fa3bc;
+      --accent: #3b82f6;
+      --accent-dim: #2563eb;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --dash-ok: #14532d;
+      --dash-warn: #713f12;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.35rem; margin-bottom: 4px; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+    .grid { display: grid; gap: 12px; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 700px) {
+      .grid-2, .grid-4 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input, select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 1rem;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+    textarea { min-height: 120px; resize: vertical; font-family: inherit; }
+    .dash {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 600px) { .dash { grid-template-columns: 1fr 1fr; } }
+    .dash-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .dash-item .val {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .dash-item .sub-val {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .dash-item .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+    .dash-item.need .val { color: var(--accent); }
+    .dash-item.collected .val { color: var(--ok); }
+    .dash-item.left.deficit .val { color: var(--warn); }
+    .dash-item.left.surplus .val { color: var(--ok); }
+    .dash-item.left.exact .val { color: var(--ok); }
+    .dash-item.debtors .val { color: var(--bad); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: var(--accent-dim); }
+    button.secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.danger { background: #7f1d1d; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    tr.unpaid td.name { color: var(--warn); }
+    tr.paid td.name { color: var(--ok); }
+    tr.empty { opacity: 0.35; }
+    .chk { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
+    .amt { width: 90px; padding: 6px 8px; font-size: 0.9rem; }
+    .cmt { width: 100%; min-width: 80px; padding: 6px 8px; font-size: 0.85rem; }
+    .debtors-list {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: var(--dash-warn);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .debtors-list.all-paid {
+      background: var(--dash-ok);
+    }
+    .debtors-list .debtors-title { font-weight: 700; margin-right: 6px; }
+    .debtors-summary {
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border-radius: 8px;
+      border-left: 3px solid var(--warn);
+    }
+    .debtors-summary.all-paid { border-left-color: var(--ok); }
+    .debtors-summary .count { font-weight: 700; color: var(--warn); }
+    .debtors-summary.all-paid .count { color: var(--ok); }
+    tr.add-row { opacity: 0.55; }
+    tr.add-row input.name-inp::placeholder { color: var(--muted); font-style: italic; }
+    .games-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .games-bar select { max-width: 280px; }
+    .calc-hint { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+    .calc-hint strong { color: var(--text); }
+    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .table-wrap { overflow-x: auto; }
+    .storage-note { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
+    .save-status { font-size: 0.8rem; color: var(--ok); margin-top: 10px; min-height: 1.2em; }
+    td.due-cell { color: var(--muted); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Учёт оплат за лёд</h1>
+    <p class="sub">Hockey dads — вставьте список из Telegram, отмечайте оплаты</p>
+
+    <div class="games-bar card" style="margin-bottom:12px;padding:12px">
+      <label style="margin:0">Игра:</label>
+      <select id="gameSelect"></select>
+      <button type="button" class="secondary" id="btnNewGame">+ Новая</button>
+      <button type="button" class="danger secondary" id="btnDeleteGame">Удалить</button>
+      <button type="button" class="secondary" id="btnExport">Скачать копию</button>
+      <button type="button" class="secondary" id="btnImport">Загрузить копию</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="save-status" id="saveStatus"></p>
+
+    <div class="dash">
+      <div class="dash-item need">
+        <div class="lbl">Нужно (расход)</div>
+        <div class="val" id="dNeed">0 ₽</div>
+        <div class="sub-val" id="dNeedBreak">лёд: — · вратари: —</div>
+      </div>
+      <div class="dash-item collected"><div class="lbl">Собрано</div><div class="val" id="dCollected">0 ₽</div></div>
+      <div class="dash-item left deficit"><div class="lbl">Осталось</div><div class="val" id="dLeft">0 ₽</div></div>
+      <div class="dash-item debtors"><div class="lbl">Не оплатили</div><div class="val" id="dDebtors">0</div></div>
+    </div>
+    <div class="debtors-list" id="debtorsList">
+      <span class="debtors-title" id="debtorsTitle">Не оплатили (0):</span>
+      <span id="debtorsNames">—</span>
+    </div>
+
+    <div class="card">
+      <h2>Параметры игры</h2>
+      <div class="grid grid-2">
+        <div>
+          <label>Площадка</label>
+          <input type="text" id="venue" value="СК Молодежка">
+        </div>
+        <div>
+          <label>Дата</label>
+          <input type="date" id="gameDate">
+        </div>
+        <div>
+          <label>Лёд, ₽/час</label>
+          <input type="number" id="iceHour" value="25000" min="0" step="100">
+        </div>
+        <div>
+          <label>Длительность</label>
+          <select id="duration">
+            <option value="1">1 час</option>
+            <option value="1.25" selected>1 час 15 минут</option>
+            <option value="1.5">1 час 30 минут</option>
+          </select>
+        </div>
+        <div>
+          <label>Вратари, ₽ за игру</label>
+          <input type="number" id="goalies" value="4500" min="0" step="100">
+        </div>
+        <div>
+          <label>План игроков (для расчёта в чате)</label>
+          <input type="number" id="planPlayers" value="16" min="1">
+        </div>
+        <div>
+          <label>Сумма с каждого (₽)</label>
+          <input type="number" id="chargePerPlayer" placeholder="Авто" min="0" step="100">
+          <p class="field-hint">Пусто — делим расход на число игроков. Или укажите одну сумму для всех, напр. 2200</p>
+        </div>
+      </div>
+      <p class="calc-hint">
+        Итого: <strong id="hTotal">0 ₽</strong>
+        (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
+        План (<span id="hPlanN">16</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
+        Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
+        К сбору: <strong id="hTarget">0 ₽</strong>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Список из Telegram</h2>
+      <label>Вставьте сообщение целиком (имена с номерами или без)</label>
+      <textarea id="pasteArea" placeholder="1. Сыров&#10;2. Попов&#10;3. Вьюник&#10;..."></textarea>
+      <div class="btn-row">
+        <button type="button" id="btnParse">Разобрать список</button>
+        <button type="button" class="secondary" id="btnAddRow">+ Добавить игрока</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Оплаты</h2>
+      <p class="debtors-summary" id="debtorsSummary"><span class="count">Не оплатили (0):</span> <span id="debtorsSummaryNames">—</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Игрок</th>
+              <th>Должен</th>
+              <th>✓</th>
+              <th>Сумма</th>
+              <th>Коммент</th>
+            </tr>
+          </thead>
+          <tbody id="playerBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Куда сохраняются данные</h2>
+      <p class="storage-note">
+        Все игры автоматически пишутся в <strong>память браузера</strong> (localStorage) на этом компьютере.
+        При закрытии вкладки ничего не пропадает. Но если очистить историю/кэш браузера или открыть файл
+        на другом устройстве — данных там не будет. Поэтому раз в неделю нажимайте
+        <strong>«Скачать копию»</strong> — получите файл <code>.json</code> в папку «Загрузки».
+        Восстановить: <strong>«Загрузить копию»</strong>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'hockey-ice-payments-v1';
+    const MAX_PLAYERS = 24;
+
+    let games = [];
+    let currentId = null;
+    let playersBound = false;
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function fmt(n) {
+      return Math.round(n).toLocaleString('ru-RU') + ' ₽';
+    }
+
+    function showSaved() {
+      const el = document.getElementById('saveStatus');
+      const now = new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      el.textContent = 'Сохранено автоматически в браузере · ' + now;
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) games = JSON.parse(raw);
+      } catch (_) { games = []; }
+      if (!games.length) games.push(newGameData());
+      currentId = games[0].id;
+      renderGameSelect();
+      applyGame(games[0]);
+      bindPlayerTable();
+      games.forEach(normalizePlayers);
+      showSaved();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
+      showSaved();
+    }
+
+    function newGameData() {
+      const d = new Date();
+      return {
+        id: uid(),
+        venue: 'СК Молодежка',
+        date: d.toISOString().slice(0, 10),
+        iceHour: 25000,
+        duration: 1.25,
+        goalies: 4500,
+        planPlayers: 16,
+        chargePerPlayer: '',
+        players: []
+      };
+    }
+
+    function currentGame() {
+      return games.find(g => g.id === currentId);
+    }
+
+    function renderGameSelect() {
+      const sel = document.getElementById('gameSelect');
+      sel.innerHTML = games.map(g => {
+        const label = (g.date || '?') + ' — ' + (g.venue || 'Игра');
+        return `<option value="${g.id}">${label}</option>`;
+      }).join('');
+      sel.value = currentId;
+    }
+
+    function getChargePerPlayer(g) {
+      const v = g.chargePerPlayer;
+      if (v === '' || v == null) return null;
+      const n = Number(v);
+      return !Number.isNaN(n) && n > 0 ? n : null;
+    }
+
+    function calcTotals(g) {
+      const iceCost = (g.iceHour || 0) * (g.duration || 0);
+      const goalieCost = g.goalies || 0;
+      const expense = iceCost + goalieCost;
+      const players = filledPlayers(g);
+      const n = players.length;
+      const autoFact = n > 0 ? Math.round(expense / n) : 0;
+      const fixed = getChargePerPlayer(g);
+      const fact = fixed != null ? fixed : autoFact;
+      const plan = g.planPlayers > 0 ? Math.round(expense / g.planPlayers) : 0;
+      const targetCollection = fact * n;
+      let collected = 0;
+      let debtors = 0;
+      players.forEach(p => {
+        const due = dueForPlayer(p, fact);
+        if (p.paid) {
+          const amt = p.amount;
+          const num = Number(String(amt).replace(/\s/g, ''));
+          collected += (amt !== '' && amt != null && !Number.isNaN(num)) ? num : due;
+        } else {
+          debtors++;
+        }
+      });
+      const left = expense - collected;
+      return {
+        iceCost, goalieCost, expense, plan, fact, autoFact, fixed,
+        n, collected, left, surplus: left < 0 ? -left : 0,
+        targetCollection, debtors, players
+      };
+    }
+
+    function syncParamsFromDom() {
+      const g = currentGame();
+      if (!g) return g;
+      g.venue = document.getElementById('venue').value;
+      g.date = document.getElementById('gameDate').value;
+      g.iceHour = Number(document.getElementById('iceHour').value) || 0;
+      g.duration = Number(document.getElementById('duration').value) || 0;
+      g.goalies = Number(document.getElementById('goalies').value) || 0;
+      g.planPlayers = Number(document.getElementById('planPlayers').value) || 16;
+      const chargeRaw = document.getElementById('chargePerPlayer').value.trim();
+      g.chargePerPlayer = chargeRaw === '' ? '' : Number(chargeRaw);
+      return g;
+    }
+
+    function syncPlayersFromDom() {
+      const g = currentGame();
+      if (!g) return;
+      normalizePlayers(g);
+      document.querySelectorAll('#playerBody tr').forEach(tr => {
+        const i = +tr.dataset.i;
+        const p = g.players[i];
+        p.name = tr.querySelector('[data-f=name]').value;
+        p.paid = tr.querySelector('[data-f=paid]').checked;
+        const amt = tr.querySelector('[data-f=amount]').value.trim();
+        p.amount = amt === '' ? '' : Number(amt);
+        p.comment = tr.querySelector('[data-f=comment]').value;
+      });
+    }
+
+    function filledPlayers(g) {
+      return (g.players || []).filter(p => (p.name || '').trim());
+    }
+
+    function updateDebtorsUI(t) {
+      const names = t.players.filter(p => !p.paid).map(p => p.name.trim());
+      const count = names.length;
+      const namesStr = count ? names.join(', ') : 'все оплатили';
+
+      document.getElementById('debtorsTitle').textContent = 'Не оплатили (' + count + '):';
+      document.getElementById('debtorsNames').textContent = namesStr;
+
+      const dl = document.getElementById('debtorsList');
+      dl.classList.toggle('all-paid', count === 0 && t.n > 0);
+
+      const summary = document.getElementById('debtorsSummary');
+      summary.classList.toggle('all-paid', count === 0 && t.n > 0);
+      summary.querySelector('.count').textContent = 'Не оплатили (' + count + '):';
+      document.getElementById('debtorsSummaryNames').textContent = namesStr;
+    }
+
+    function updateDashboard() {
+      const g = currentGame();
+      if (!g) return;
+      const t = calcTotals(g);
+      document.getElementById('dNeed').textContent = fmt(t.expense);
+      document.getElementById('dNeedBreak').textContent =
+        'лёд: ' + fmt(t.iceCost) + ' · вратари: ' + fmt(t.goalieCost);
+      document.getElementById('dCollected').textContent = fmt(t.collected);
+
+      const leftEl = document.getElementById('dLeft');
+      const leftBox = leftEl.closest('.dash-item');
+      leftBox.classList.remove('deficit', 'surplus', 'exact');
+      if (t.left > 0) {
+        leftEl.textContent = fmt(t.left);
+        leftBox.classList.add('deficit');
+      } else if (t.left < 0) {
+        leftEl.textContent = '+' + fmt(t.surplus);
+        leftBox.classList.add('surplus');
+      } else {
+        leftEl.textContent = '0 ₽';
+        leftBox.classList.add('exact');
+      }
+
+      document.getElementById('dDebtors').textContent = t.debtors;
+      document.getElementById('hTotal').textContent = fmt(t.expense);
+      document.getElementById('hIce').textContent = fmt(t.iceCost);
+      document.getElementById('hGoalies').textContent = fmt(t.goalieCost);
+      document.getElementById('hPlanN').textContent = g.planPlayers;
+      document.getElementById('hPlan').textContent = fmt(t.plan);
+      document.getElementById('hFact').textContent = fmt(t.fact);
+      document.getElementById('hFactN').textContent = t.n;
+      document.getElementById('hTarget').textContent = fmt(t.targetCollection);
+      updateDebtorsUI(t);
+    }
+
+    function parseTelegramList(text) {
+      const lines = text.split(/\r?\n/);
+      const players = [];
+      const skip = /^(цена|сумма|стоимость|лед|вратар|четверг|ск\s|с\sк|🏒|🥅|—|-{2,}|\d{1,2}:\d{2})/i;
+      const goalie = /вратар|🥅|голкипер/i;
+
+      for (const raw of lines) {
+        let line = raw.trim();
+        if (!line || skip.test(line) || goalie.test(line)) continue;
+        line = line.replace(/^[\d]+[\.\)\-]\s*/, '');
+        line = line.replace(/^[-•*]\s*/, '');
+        if (/^\d+$/.test(line)) continue;
+        if (line.length < 2) continue;
+        players.push({ name: line, paid: false, amount: '', comment: '', dueOverride: null });
+      }
+      return players;
+    }
+
+    function emptyPlayer() {
+      return { name: '', paid: false, amount: '', comment: '', dueOverride: null };
+    }
+
+    function normalizePlayers(g) {
+      if (!g.players) g.players = [];
+      const filled = g.players.filter(p => (p.name || '').trim());
+      g.players = filled;
+      g.players.push(emptyPlayer());
+    }
+
+    function rowClass(p, isLastEmpty) {
+      const name = (p.name || '').trim();
+      if (!name) return isLastEmpty ? 'add-row' : 'empty';
+      return p.paid ? 'paid' : 'unpaid';
+    }
+
+    function dueForPlayer(p, fact) {
+      if (p.dueOverride != null) return p.dueOverride;
+      return (p.name || '').trim() ? fact : '';
+    }
+
+    function updateDueCells() {
+      const g = currentGame();
+      if (!g) return;
+      const fact = calcTotals(g).fact;
+      document.querySelectorAll('#playerBody tr').forEach(tr => {
+        const i = +tr.dataset.i;
+        const due = dueForPlayer(g.players[i], fact);
+        const cell = tr.querySelector('.due-cell');
+        if (cell) cell.textContent = due !== '' ? fmt(due) : '—';
+        const amtInp = tr.querySelector('[data-f=amount]');
+        if (amtInp && due !== '') amtInp.placeholder = due;
+      });
+    }
+
+    function updateRowClass(tr, p, g) {
+      const i = +tr.dataset.i;
+      const isLastEmpty = i === g.players.length - 1 && !(p.name || '').trim();
+      tr.className = rowClass(p, isLastEmpty);
+      const hasName = !!(p.name || '').trim();
+      tr.querySelector('[data-f=paid]').disabled = !hasName;
+      tr.querySelector('[data-f=amount]').disabled = !hasName;
+      tr.querySelector('[data-f=comment]').disabled = !hasName;
+    }
+
+    function trimTrailingEmpty(g) {
+      while (g.players.length > 1 && !(g.players[g.players.length - 1].name || '').trim()
+          && !(g.players[g.players.length - 2].name || '').trim()) {
+        g.players.pop();
+      }
+      const last = g.players[g.players.length - 1];
+      if (last && (last.name || '').trim()) {
+        if (filledPlayers(g).length < MAX_PLAYERS) g.players.push(emptyPlayer());
+      }
+      if (!g.players.length) g.players.push(emptyPlayer());
+    }
+
+    function renderPlayers(g) {
+      normalizePlayers(g);
+      trimTrailingEmpty(g);
+      const t = calcTotals(g);
+      const tbody = document.getElementById('playerBody');
+      const lastIdx = g.players.length - 1;
+      let num = 0;
+      tbody.innerHTML = g.players.map((p, i) => {
+        const hasName = (p.name || '').trim();
+        const displayNum = hasName ? ++num : '';
+        const due = dueForPlayer(p, t.fact);
+        const isLastEmpty = i === lastIdx && !hasName;
+        const cls = rowClass(p, isLastEmpty);
+        const amtVal = p.amount !== '' && p.amount != null ? p.amount : '';
+        const ph = isLastEmpty ? 'Имя игрока' : '';
+        return `<tr class="${cls}" data-i="${i}">
+          <td>${displayNum}</td>
+          <td class="name"><input type="text" class="cmt name-inp" data-f="name" value="${esc((p.name || '').trim() ? p.name : '')}" placeholder="${ph}"></td>
+          <td class="due-cell">${due !== '' ? fmt(due) : '—'}</td>
+          <td><input type="checkbox" class="chk" data-f="paid" ${p.paid ? 'checked' : ''} ${!(p.name || '').trim() ? 'disabled' : ''}></td>
+          <td><input type="text" inputmode="numeric" class="amt" data-f="amount" value="${amtVal !== '' ? esc(String(amtVal)) : ''}" placeholder="${due || ''}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
+          <td><input type="text" class="cmt" data-f="comment" value="${esc(p.comment)}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    }
+
+    function bindPlayerTable() {
+      if (playersBound) return;
+      playersBound = true;
+      const tbody = document.getElementById('playerBody');
+
+      tbody.addEventListener('input', (e) => {
+        const inp = e.target;
+        if (!inp.dataset.f) return;
+        const tr = inp.closest('tr');
+        const g = currentGame();
+        const p = g.players[+tr.dataset.i];
+        const i = +tr.dataset.i;
+        const field = inp.dataset.f;
+
+        if (field === 'name') {
+          const prevTrimmed = (p.name || '').trim();
+          p.name = inp.value;
+          if (!prevTrimmed && inp.value.trim() && i === g.players.length - 1 && filledPlayers(g).length < MAX_PLAYERS) {
+            g.players.push(emptyPlayer());
+            save();
+            renderPlayers(g);
+            updateDashboard();
+            return;
+          }
+          updateRowClass(tr, p, g);
+          updateDueCells();
+        } else if (field === 'amount') {
+          p.amount = inp.value.trim();
+        } else if (field === 'comment') {
+          p.comment = inp.value;
+        }
+        save();
+        updateDashboard();
+      });
+
+      tbody.addEventListener('change', (e) => {
+        const inp = e.target;
+        if (inp.dataset.f !== 'paid') return;
+        const tr = inp.closest('tr');
+        const g = currentGame();
+        const p = g.players[+tr.dataset.i];
+        p.paid = inp.checked;
+        updateRowClass(tr, p, g);
+        save();
+        updateDashboard();
+      });
+    }
+
+    function persistCurrentGame() {
+      syncParamsFromDom();
+      syncPlayersFromDom();
+      save();
+      renderGameSelect();
+    }
+
+    function applyGame(g) {
+      document.getElementById('venue').value = g.venue || '';
+      document.getElementById('gameDate').value = g.date || '';
+      document.getElementById('iceHour').value = g.iceHour ?? 25000;
+      document.getElementById('duration').value = String(g.duration ?? 1.25);
+      document.getElementById('goalies').value = g.goalies ?? 4500;
+      document.getElementById('planPlayers').value = g.planPlayers ?? 16;
+      const charge = g.chargePerPlayer;
+      document.getElementById('chargePerPlayer').value =
+        charge !== '' && charge != null && !Number.isNaN(Number(charge)) ? charge : '';
+      renderPlayers(g);
+      updateDashboard();
+    }
+
+    function onParamsChange() {
+      syncParamsFromDom();
+      save();
+      updateDueCells();
+      updateDashboard();
+      renderGameSelect();
+    }
+
+    function bindParams() {
+      ['venue', 'gameDate', 'iceHour', 'duration', 'goalies', 'planPlayers', 'chargePerPlayer'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', onParamsChange);
+        el.addEventListener('change', onParamsChange);
+      });
+    }
+
+    function exportBackup() {
+      persistCurrentGame();
+      const blob = new Blob([JSON.stringify(games, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = URL.createObjectURL(blob);
+      a.download = 'hockey-payments-' + date + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function importBackup(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!Array.isArray(data) || !data.length) throw new Error('empty');
+          games = data;
+          currentId = games[0].id;
+          save();
+          renderGameSelect();
+          applyGame(currentGame());
+          alert('Загружено игр: ' + games.length);
+        } catch (_) {
+          alert('Не удалось прочитать файл. Нужен .json из «Скачать копию».');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    document.getElementById('btnParse').addEventListener('click', () => {
+      const text = document.getElementById('pasteArea').value;
+      const parsed = parseTelegramList(text);
+      const g = currentGame();
+      g.players = parsed.slice(0, MAX_PLAYERS);
+      g.players.push(emptyPlayer());
+      save();
+      renderPlayers(g);
+      updateDashboard();
+    });
+
+    document.getElementById('btnAddRow').addEventListener('click', () => {
+      const g = currentGame();
+      normalizePlayers(g);
+      const last = g.players[g.players.length - 1];
+      if ((last.name || '').trim()) {
+        if (filledPlayers(g).length < MAX_PLAYERS) g.players.push(emptyPlayer());
+      }
+      save();
+      renderPlayers(g);
+      updateDashboard();
+      const inputs = document.querySelectorAll('#playerBody tr.add-row input.name-inp');
+      const inp = inputs[inputs.length - 1];
+      if (inp) inp.focus();
+    });
+
+    document.getElementById('btnNewGame').addEventListener('click', () => {
+      persistCurrentGame();
+      const ng = newGameData();
+      games.unshift(ng);
+      currentId = ng.id;
+      save();
+      renderGameSelect();
+      applyGame(ng);
+      document.getElementById('pasteArea').value = '';
+    });
+
+    document.getElementById('btnDeleteGame').addEventListener('click', () => {
+      if (games.length <= 1) { alert('Нельзя удалить единственную игру'); return; }
+      if (!confirm('Удалить эту игру?')) return;
+      persistCurrentGame();
+      games = games.filter(g => g.id !== currentId);
+      currentId = games[0].id;
+      save();
+      renderGameSelect();
+      applyGame(games[0]);
+    });
+
+    document.getElementById('gameSelect').addEventListener('change', e => {
+      persistCurrentGame();
+      currentId = e.target.value;
+      applyGame(currentGame());
+    });
+
+    document.getElementById('btnExport').addEventListener('click', exportBackup);
+
+    document.getElementById('btnImport').addEventListener('click', () => {
+      document.getElementById('importFile').click();
+    });
+
+    document.getElementById('importFile').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) importBackup(file);
+      e.target.value = '';
+    });
+
+    bindParams();
+    load();
+  </script>
+</body>
+</html>
