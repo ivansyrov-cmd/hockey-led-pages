@@ -12,7 +12,7 @@ if (-not (gh auth status 2>$null)) {
 $owner = gh api user -q .login
 Write-Host "Account: $owner"
 
-if (-not (git remote get-url origin 2>$null)) {
+if (-not (git remote 2>$null | Select-String origin)) {
     gh repo create $repoName --public --source=. --remote=origin --description "Hockey ice payment tracker"
     git push -u origin main
 } else {
