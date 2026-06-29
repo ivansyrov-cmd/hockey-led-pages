@@ -98,6 +98,7 @@
     }
     .dash-item .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
     .dash-item.need .val { color: var(--accent); }
+    #dNeed { color: var(--accent); }
     .dash-item.collected .val { color: var(--ok); }
     .dash-item.left.deficit .val { color: var(--warn); }
     .dash-item.left.surplus .val { color: var(--ok); }
@@ -293,7 +294,7 @@
         </div>
         <div>
           <label>Вратари, ₽ за игру</label>
-          <input type="number" id="goalies" value="4500" min="0" step="100">
+          <input type="number" id="goalies" value="5000" min="0" step="100">
         </div>
         <div>
           <label>План игроков (для расчёта в чате)</label>
@@ -364,6 +365,8 @@
   <script>
     const STORAGE_KEY = 'hockey-ice-payments-v1';
     const MAX_PLAYERS = 24;
+    const DEFAULT_PLAN_PLAYERS = 20;
+    const DEFAULT_GOALIES = 5000;
 
     let games = [];
     let currentId = null;
@@ -407,11 +410,16 @@
         if (raw) games = JSON.parse(raw);
       } catch (_) { games = []; }
       if (!games.length) games.push(newGameData());
+      let migrated = false;
+      games.forEach(g => {
+        if (g.planPlayers === 16) { g.planPlayers = DEFAULT_PLAN_PLAYERS; migrated = true; }
+        ensurePlayerRows(g);
+      });
+      if (migrated) save();
       currentId = games[0].id;
       renderGameSelect();
       applyGame(games[0]);
       bindPlayerTable();
-      games.forEach(normalizePlayers);
       showSaved();
     }
 
@@ -428,8 +436,8 @@
         date: d.toISOString().slice(0, 10),
         iceHour: 25000,
         duration: 1.25,
-        goalies: 4500,
-        planPlayers: 20,
+        goalies: DEFAULT_GOALIES,
+        planPlayers: DEFAULT_PLAN_PLAYERS,
         chargePerPlayer: '',
         players: []
       };
@@ -494,7 +502,7 @@
       g.iceHour = Number(document.getElementById('iceHour').value) || 0;
       g.duration = Number(document.getElementById('duration').value) || 0;
       g.goalies = Number(document.getElementById('goalies').value) || 0;
-      g.planPlayers = Number(document.getElementById('planPlayers').value) || 20;
+      g.planPlayers = Number(document.getElementById('planPlayers').value) || DEFAULT_PLAN_PLAYERS;
       const chargeRaw = document.getElementById('chargePerPlayer').value.trim();
       g.chargePerPlayer = chargeRaw === '' ? '' : Number(chargeRaw);
       return g;
@@ -503,7 +511,6 @@
     function syncPlayersFromDom() {
       const g = currentGame();
       if (!g) return;
-      normalizePlayers(g);
       document.querySelectorAll('#playerBody tr').forEach(tr => {
         const i = +tr.dataset.i;
         const p = g.players[i];
@@ -593,11 +600,21 @@
       return { name: '', paid: false, amount: '', comment: '', dueOverride: null };
     }
 
-    function normalizePlayers(g) {
+    function ensurePlayerRows(g) {
       if (!g.players) g.players = [];
-      const filled = g.players.filter(p => (p.name || '').trim());
-      g.players = filled;
-      g.players.push(emptyPlayer());
+      const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
+      const filled = filledPlayers(g);
+
+      if (filled.length === 0) {
+        while (g.players.length < plan) g.players.push(emptyPlayer());
+        if (g.players.length > plan) g.players.length = plan;
+        return;
+      }
+
+      const lastFilledIdx = g.players.reduce((max, p, i) =>
+        (p.name || '').trim() ? i : max, -1);
+      const minLen = Math.max(plan, lastFilledIdx + 2);
+      while (g.players.length < minLen) g.players.push(emptyPlayer());
     }
 
     function rowClass(p, isLastEmpty) {
@@ -625,6 +642,17 @@
       });
     }
 
+    function updateRowNumbers(g) {
+      let num = 0;
+      document.querySelectorAll('#playerBody tr').forEach(tr => {
+        const i = +tr.dataset.i;
+        const p = g.players[i];
+        if (!p || !tr.cells[0]) return;
+        const hasName = !!(p.name || '').trim();
+        tr.cells[0].textContent = hasName ? ++num : '';
+      });
+    }
+
     function updateRowClass(tr, p, g) {
       const i = +tr.dataset.i;
       const isLastEmpty = i === g.players.length - 1 && !(p.name || '').trim();
@@ -633,24 +661,42 @@
       tr.querySelector('[data-f=paid]').disabled = !hasName;
       tr.querySelector('[data-f=amount]').disabled = !hasName;
       tr.querySelector('[data-f=comment]').disabled = !hasName;
+      const delTd = tr.querySelector('.col-del');
+      if (delTd) {
+        if (hasName && !delTd.querySelector('.btn-del')) {
+          delTd.innerHTML = '<button type="button" class="btn-del" title="Удалить игрока">удалить</button>';
+        } else if (!hasName) {
+          delTd.innerHTML = '';
+        }
+      }
       const delBtn = tr.querySelector('.btn-del');
       if (delBtn) delBtn.style.visibility = hasName ? 'visible' : 'hidden';
     }
 
     function trimTrailingEmpty(g) {
-      while (g.players.length > 1 && !(g.players[g.players.length - 1].name || '').trim()
-          && !(g.players[g.players.length - 2].name || '').trim()) {
+      const filled = filledPlayers(g);
+      const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
+
+      if (filled.length === 0) return;
+
+      const lastFilledIdx = g.players.reduce((max, p, i) =>
+        (p.name || '').trim() ? i : max, -1);
+      const minLen = Math.max(plan, lastFilledIdx + 2);
+
+      while (g.players.length > minLen) {
+        const last = g.players[g.players.length - 1];
+        if ((last.name || '').trim()) break;
         g.players.pop();
       }
+
       const last = g.players[g.players.length - 1];
-      if (last && (last.name || '').trim()) {
-        if (filledPlayers(g).length < MAX_PLAYERS) g.players.push(emptyPlayer());
+      if (last && (last.name || '').trim() && filled.length < MAX_PLAYERS) {
+        g.players.push(emptyPlayer());
       }
-      if (!g.players.length) g.players.push(emptyPlayer());
     }
 
     function renderPlayers(g) {
-      normalizePlayers(g);
+      ensurePlayerRows(g);
       trimTrailingEmpty(g);
       const t = calcTotals(g);
       const tbody = document.getElementById('playerBody');
@@ -663,7 +709,7 @@
         const isLastEmpty = i === lastIdx && !hasName;
         const cls = rowClass(p, isLastEmpty);
         const amtVal = p.amount !== '' && p.amount != null ? p.amount : '';
-        const ph = isLastEmpty ? 'Имя игрока' : '';
+        const ph = !hasName ? 'Имя игрока' : '';
         return `<tr class="${cls}" data-i="${i}">
           <td>${displayNum}</td>
           <td class="name"><input type="text" class="cmt name-inp" data-f="name" value="${esc((p.name || '').trim() ? p.name : '')}" placeholder="${ph}"></td>
@@ -697,7 +743,10 @@
         if (field === 'name') {
           const prevTrimmed = (p.name || '').trim();
           p.name = inp.value;
-          if (!prevTrimmed && inp.value.trim() && i === g.players.length - 1 && filledPlayers(g).length < MAX_PLAYERS) {
+          const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
+          const filledCount = filledPlayers(g).length;
+          if (!prevTrimmed && inp.value.trim() && i === g.players.length - 1
+              && filledCount >= plan && filledCount < MAX_PLAYERS) {
             const caret = inp.selectionStart;
             const editIdx = i;
             g.players.push(emptyPlayer());
@@ -714,6 +763,7 @@
             return;
           }
           updateRowClass(tr, p, g);
+          updateRowNumbers(g);
           updateDueCells();
         } else if (field === 'amount') {
           p.amount = inp.value.trim();
@@ -743,7 +793,7 @@
         const g = currentGame();
         const i = +tr.dataset.i;
         g.players.splice(i, 1);
-        normalizePlayers(g);
+        ensurePlayerRows(g);
         save();
         renderPlayers(g);
         updateDashboard();
@@ -762,8 +812,8 @@
       document.getElementById('gameDate').value = g.date || '';
       document.getElementById('iceHour').value = g.iceHour ?? 25000;
       document.getElementById('duration').value = String(g.duration ?? 1.25);
-      document.getElementById('goalies').value = g.goalies ?? 4500;
-      document.getElementById('planPlayers').value = g.planPlayers ?? 20;
+      document.getElementById('goalies').value = g.goalies ?? DEFAULT_GOALIES;
+      document.getElementById('planPlayers').value = g.planPlayers ?? DEFAULT_PLAN_PLAYERS;
       const charge = g.chargePerPlayer;
       document.getElementById('chargePerPlayer').value =
         charge !== '' && charge != null && !Number.isNaN(Number(charge)) ? charge : '';
@@ -772,9 +822,14 @@
       updateDateFormatted();
     }
 
-    function onParamsChange() {
+    function onParamsChange(e) {
       syncParamsFromDom();
+      const g = currentGame();
       save();
+      if (e && e.target && e.target.id === 'planPlayers') {
+        ensurePlayerRows(g);
+        renderPlayers(g);
+      }
       updateDueCells();
       updateDashboard();
       updateDateFormatted();
