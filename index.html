@@ -70,6 +70,19 @@
       outline: 2px solid var(--accent);
       border-color: transparent;
     }
+    select {
+      color-scheme: dark;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 0.95em;
+      height: 0.95em;
+      margin-left: 2px;
+      cursor: pointer;
+      opacity: 0.85;
+      background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e8edf4' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='1.5'/%3E%3Cline x1='8' y1='3' x2='8' y2='6'/%3E%3Cline x1='16' y1='3' x2='16' y2='6'/%3E%3Cline x1='4' y1='9' x2='20' y2='9'/%3E%3C/svg%3E");
+    }
     textarea { min-height: 120px; resize: vertical; font-family: inherit; }
     .dash {
       display: grid;
@@ -193,7 +206,11 @@
       .games-bar-actions { grid-column: 1 / -1; }
     }
     .calc-hint { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+    .calc-hint-line { margin: 0; }
+    .calc-hint-line + .calc-hint-line { margin-top: 6px; }
     .calc-hint strong { color: var(--text); }
+    .calc-hint .diff-pos { color: var(--ok); }
+    .calc-hint .diff-neg { color: var(--warn); }
     .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
     .table-wrap { overflow-x: auto; }
     .storage-note { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
@@ -306,13 +323,18 @@
           <p class="field-hint">Пусто — делим расход на число игроков. Или укажите одну сумму для всех, напр. 2200</p>
         </div>
       </div>
-      <p class="calc-hint">
-        Итого: <strong id="hTotal">0 ₽</strong>
-        (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
-        План (<span id="hPlanN">20</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
-        Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
-        Будет собрано: <strong id="hTarget">0 ₽</strong>
-      </p>
+      <div class="calc-hint">
+        <p class="calc-hint-line">
+          План: <strong id="hTotal">0 ₽</strong>
+          (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
+          План (<span id="hPlanN">20</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
+        </p>
+        <p class="calc-hint-line">
+          Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
+          Будет собрано: <strong id="hTarget">0 ₽</strong> ·
+          разница составит <strong id="hDiff">0 ₽</strong>
+        </p>
+      </div>
     </div>
 
     <div class="card">
@@ -378,6 +400,14 @@
 
     function fmt(n) {
       return Math.round(n).toLocaleString('ru-RU') + ' ₽';
+    }
+
+    function fmtSigned(n) {
+      const v = Math.round(n);
+      const abs = Math.abs(v).toLocaleString('ru-RU') + ' ₽';
+      if (v > 0) return '+' + abs;
+      if (v < 0) return '−' + abs;
+      return '0 ₽';
     }
 
     const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -639,6 +669,10 @@
       document.getElementById('hFact').textContent = fmt(t.fact);
       document.getElementById('hFactN').textContent = t.n;
       document.getElementById('hTarget').textContent = fmt(t.targetCollection);
+      const diff = t.targetCollection - t.expense;
+      const diffEl = document.getElementById('hDiff');
+      diffEl.textContent = fmtSigned(diff);
+      diffEl.className = diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : '';
       updateDebtorsUI(t);
     }
 
