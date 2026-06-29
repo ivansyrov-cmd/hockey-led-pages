@@ -463,34 +463,96 @@
       return !Number.isNaN(n) && n > 0 ? n : null;
     }
 
+    function paymentNum(p) {
+      const amt = p.amount;
+      if (amt === '' || amt == null) return null;
+      const num = Number(String(amt).replace(/\s/g, ''));
+      return Number.isNaN(num) ? null : num;
+    }
+
+    function splitEven(total, count) {
+      if (count <= 0) return [];
+      const abs = Math.abs(Math.round(total));
+      const base = Math.floor(abs / count);
+      const rem = abs - base * count;
+      const sign = total < 0 ? -1 : 1;
+      return Array.from({ length: count }, (_, i) => sign * (base + (i < rem ? 1 : 0)));
+    }
+
+    function dueForIndex(g, i) {
+      return calcTotals(g).dues[i];
+    }
+
     function calcTotals(g) {
       const iceCost = (g.iceHour || 0) * (g.duration || 0);
       const goalieCost = g.goalies || 0;
       const expense = iceCost + goalieCost;
       const players = filledPlayers(g);
       const n = players.length;
-      const autoFact = n > 0 ? Math.round(expense / n) : 0;
       const fixed = getChargePerPlayer(g);
-      const fact = fixed != null ? fixed : autoFact;
+      const autoFact = n > 0 ? Math.round(expense / n) : 0;
+      const baseFact = fixed != null ? fixed : autoFact;
       const plan = g.planPlayers > 0 ? Math.round(expense / g.planPlayers) : 0;
-      const targetCollection = fact * n;
+
       let collected = 0;
-      let debtors = 0;
-      players.forEach(p => {
-        const due = dueForPlayer(p, fact);
+      let fixedUnpaidTotal = 0;
+      const equalSplitIndices = [];
+      const dues = {};
+
+      g.players.forEach((p, i) => {
+        if (!(p.name || '').trim()) {
+          dues[i] = '';
+          return;
+        }
+
+        if (p.dueOverride != null) {
+          if (p.paid) {
+            const num = paymentNum(p);
+            if (num != null) collected += num;
+          } else {
+            fixedUnpaidTotal += p.dueOverride;
+          }
+          return;
+        }
+
         if (p.paid) {
-          const amt = p.amount;
-          const num = Number(String(amt).replace(/\s/g, ''));
-          collected += (amt !== '' && amt != null && !Number.isNaN(num)) ? num : due;
+          const num = paymentNum(p);
+          if (num != null) collected += num;
         } else {
-          debtors++;
+          equalSplitIndices.push(i);
         }
       });
-      const left = expense - collected;
+
+      const remaining = Math.max(0, expense - collected - fixedUnpaidTotal);
+      const shares = splitEven(remaining, equalSplitIndices.length);
+      equalSplitIndices.forEach((idx, ui) => { dues[idx] = shares[ui]; });
+
+      g.players.forEach((p, i) => {
+        if (!(p.name || '').trim()) return;
+
+        if (p.dueOverride != null) {
+          dues[i] = p.dueOverride;
+          return;
+        }
+
+        if (p.paid) {
+          const num = paymentNum(p);
+          dues[i] = num != null ? num : (p.owedWhenPaid != null ? p.owedWhenPaid : baseFact);
+        }
+      });
+
+      let debtors = 0;
+      players.forEach(p => { if (!p.paid) debtors++; });
+
+      const perUnpaid = shares.length ? shares[0] : baseFact;
+
       return {
-        iceCost, goalieCost, expense, plan, fact, autoFact, fixed,
-        n, collected, left, surplus: left < 0 ? -left : 0,
-        targetCollection, debtors, players
+        iceCost, goalieCost, expense, plan, fact: baseFact, autoFact, fixed,
+        perUnpaid, dues,
+        n, collected, left: expense - collected,
+        surplus: collected > expense ? collected - expense : 0,
+        targetCollection: collected + shares.reduce((a, b) => a + b, 0) + fixedUnpaidTotal,
+        debtors, players
       };
     }
 
@@ -591,13 +653,13 @@
         line = line.replace(/^[-•*]\s*/, '');
         if (/^\d+$/.test(line)) continue;
         if (line.length < 2) continue;
-        players.push({ name: line, paid: false, amount: '', comment: '', dueOverride: null });
+        players.push({ name: line, paid: false, amount: '', comment: '', dueOverride: null, owedWhenPaid: null });
       }
       return players;
     }
 
     function emptyPlayer() {
-      return { name: '', paid: false, amount: '', comment: '', dueOverride: null };
+      return { name: '', paid: false, amount: '', comment: '', dueOverride: null, owedWhenPaid: null };
     }
 
     function ensurePlayerRows(g) {
@@ -623,22 +685,23 @@
       return p.paid ? 'paid' : 'unpaid';
     }
 
-    function dueForPlayer(p, fact) {
-      if (p.dueOverride != null) return p.dueOverride;
-      return (p.name || '').trim() ? fact : '';
-    }
-
     function updateDueCells() {
       const g = currentGame();
       if (!g) return;
-      const fact = calcTotals(g).fact;
+      const t = calcTotals(g);
       document.querySelectorAll('#playerBody tr').forEach(tr => {
         const i = +tr.dataset.i;
-        const due = dueForPlayer(g.players[i], fact);
+        const due = t.dues[i];
+        const p = g.players[i];
         const cell = tr.querySelector('.due-cell');
-        if (cell) cell.textContent = due !== '' ? fmt(due) : '—';
+        if (cell) cell.textContent = due !== '' && due != null ? fmt(due) : '—';
         const amtInp = tr.querySelector('[data-f=amount]');
-        if (amtInp && due !== '') amtInp.placeholder = due;
+        if (!amtInp || !p) return;
+        if (!p.paid) {
+          amtInp.placeholder = due !== '' && due != null ? String(due) : '';
+        } else {
+          amtInp.placeholder = '';
+        }
       });
     }
 
@@ -705,7 +768,7 @@
       tbody.innerHTML = g.players.map((p, i) => {
         const hasName = (p.name || '').trim();
         const displayNum = hasName ? ++num : '';
-        const due = dueForPlayer(p, t.fact);
+        const due = t.dues[i] ?? '';
         const isLastEmpty = i === lastIdx && !hasName;
         const cls = rowClass(p, isLastEmpty);
         const amtVal = p.amount !== '' && p.amount != null ? p.amount : '';
@@ -771,6 +834,7 @@
           p.comment = inp.value;
         }
         save();
+        if (field !== 'name') updateDueCells();
         updateDashboard();
       });
 
@@ -779,10 +843,31 @@
         if (inp.dataset.f !== 'paid') return;
         const tr = inp.closest('tr');
         const g = currentGame();
-        const p = g.players[+tr.dataset.i];
-        p.paid = inp.checked;
+        const i = +tr.dataset.i;
+        const p = g.players[i];
+        const amtInp = tr.querySelector('[data-f=amount]');
+
+        if (inp.checked) {
+          if (paymentNum(p) == null) {
+            const due = dueForIndex(g, i);
+            const fill = due !== '' && due != null ? due : calcTotals(g).fact;
+            p.owedWhenPaid = fill;
+            p.amount = fill;
+            if (amtInp) amtInp.value = fill;
+          } else {
+            p.owedWhenPaid = paymentNum(p);
+          }
+          p.paid = true;
+        } else {
+          p.paid = false;
+          p.amount = '';
+          p.owedWhenPaid = null;
+          if (amtInp) amtInp.value = '';
+        }
+
         updateRowClass(tr, p, g);
         save();
+        updateDueCells();
         updateDashboard();
       });
 
