@@ -3,22 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Учёт оплат за лёд</title>
+  <title>Учёт оплат за лёд (светлая тема)</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --surface: #1a2332;
-      --surface2: #243044;
-      --border: #2d3f56;
-      --text: #e8edf4;
-      --muted: #8fa3bc;
+      --bg: #ebebeb;
+      --surface: #ffffff;
+      --surface2: #ffffff;
+      --border: #c5c5c5;
+      --text: #1a1a1a;
+      --heading: #000000;
+      --muted: #5c5c5c;
       --accent: #3b82f6;
       --accent-dim: #2563eb;
       --ok: #22c55e;
       --warn: #f59e0b;
       --bad: #ef4444;
-      --dash-ok: #14532d;
-      --dash-warn: #713f12;
+      --dash-ok: #e8f5e9;
+      --dash-warn: #fff8e1;
+      --brand-orange: #ea580c;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -29,8 +31,21 @@
       min-height: 100vh;
     }
     .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 1.35rem; margin-bottom: 4px; }
+    h1 { font-size: 1.35rem; margin-bottom: 4px; color: var(--heading); font-weight: 700; }
     .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+    .theme-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
     .grid { display: grid; gap: 12px; }
     .grid-2 { grid-template-columns: 1fr 1fr; }
     .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -40,35 +55,38 @@
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 4px;
+      padding: 20px;
       margin-bottom: 16px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
     .card h2 {
       font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: var(--muted);
+      color: var(--heading);
+      font-weight: 700;
       margin-bottom: 12px;
     }
     label {
       display: block;
       font-size: 0.8rem;
-      color: var(--muted);
+      color: var(--heading);
+      font-weight: 600;
       margin-bottom: 4px;
     }
     input, select, textarea {
       width: 100%;
       background: var(--surface2);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 4px;
       color: var(--text);
       padding: 10px 12px;
       font-size: 1rem;
     }
     input:focus, textarea:focus, select:focus {
       outline: 2px solid var(--accent);
-      border-color: transparent;
+      border-color: var(--accent);
     }
     textarea { min-height: 120px; resize: vertical; font-family: inherit; }
     .dash {
@@ -81,9 +99,10 @@
     .dash-item {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 14px;
       text-align: center;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
     .dash-item .val {
       font-size: 1.5rem;
@@ -96,7 +115,7 @@
       margin-top: 6px;
       line-height: 1.35;
     }
-    .dash-item .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+    .dash-item .lbl { font-size: 0.75rem; color: var(--heading); font-weight: 600; text-transform: uppercase; }
     .dash-item.need .val { color: var(--accent); }
     .dash-item.collected .val { color: var(--ok); }
     .dash-item.left.deficit .val { color: var(--warn); }
@@ -105,25 +124,37 @@
     .dash-item.debtors .val { color: var(--bad); }
     .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     button {
-      background: var(--accent);
+      background: var(--heading);
       color: #fff;
       border: none;
-      border-radius: 8px;
+      border-radius: 4px;
       padding: 10px 16px;
       font-size: 0.95rem;
       cursor: pointer;
       font-weight: 600;
     }
-    button:hover { background: var(--accent-dim); }
+    button:hover { background: #333; }
     button.secondary {
-      background: var(--surface2);
-      color: var(--text);
+      background: var(--surface);
+      color: var(--heading);
       border: 1px solid var(--border);
     }
-    button.danger { background: #7f1d1d; }
+    button.secondary:hover { background: #f5f5f5; }
+    button.primary-orange {
+      background: var(--brand-orange);
+      color: #fff;
+      border: none;
+    }
+    button.primary-orange:hover { background: #c2410c; }
+    button.danger.secondary {
+      background: var(--surface);
+      color: var(--bad);
+      border: 1px solid var(--border);
+    }
+    button.danger.secondary:hover { background: #f5f5f5; color: #b91c1c; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
-    th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    th { color: var(--heading); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
     tr.unpaid td.name { color: var(--warn); }
     tr.paid td.name { color: var(--ok); }
     tr.empty { opacity: 0.35; }
@@ -134,19 +165,23 @@
       margin-top: 10px;
       padding: 10px 12px;
       background: var(--dash-warn);
-      border-radius: 8px;
+      border: 1px solid #e8d9a8;
+      border-radius: 4px;
       font-size: 0.9rem;
+      color: var(--text);
     }
     .debtors-list.all-paid {
       background: var(--dash-ok);
+      border-color: #a5d6a7;
     }
-    .debtors-list .debtors-title { font-weight: 700; margin-right: 6px; }
+    .debtors-list .debtors-title { font-weight: 700; margin-right: 6px; color: var(--heading); }
     .debtors-summary {
       font-size: 0.95rem;
       margin-bottom: 12px;
       padding: 10px 12px;
-      background: var(--surface2);
-      border-radius: 8px;
+      background: var(--surface);
+      border-radius: 4px;
+      border: 1px solid var(--border);
       border-left: 3px solid var(--warn);
     }
     .debtors-summary.all-paid { border-left-color: var(--ok); }
@@ -154,101 +189,31 @@
     .debtors-summary.all-paid .count { color: var(--ok); }
     tr.add-row { opacity: 0.55; }
     tr.add-row input.name-inp::placeholder { color: var(--muted); font-style: italic; }
-    .games-bar.card {
-      margin-bottom: 10px;
-    }
-    .games-bar-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      align-items: center;
-    }
-    .games-field {
-      grid-column: 1 / 3;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-width: 0;
-    }
-    .games-field label {
-      margin: 0;
-      flex-shrink: 0;
-    }
-    .games-field select {
-      flex: 1;
-      min-width: 0;
-      width: 100%;
-    }
-    .games-bar-actions {
-      grid-column: 3 / 5;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    @media (max-width: 600px) {
-      .games-bar-grid { grid-template-columns: 1fr; }
-      .games-field,
-      .games-bar-actions { grid-column: 1 / -1; }
-    }
+    .games-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .games-bar select { max-width: 280px; }
     .calc-hint { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
-    .calc-hint strong { color: var(--text); }
-    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .calc-hint strong { color: var(--heading); }
+    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; font-weight: 400; }
     .table-wrap { overflow-x: auto; }
     .storage-note { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
     .save-status { font-size: 0.8rem; color: var(--ok); margin-top: 10px; min-height: 1.2em; }
     td.due-cell { color: var(--muted); white-space: nowrap; }
-    .text-link {
-      color: var(--accent);
-      text-decoration: underline;
-      cursor: pointer;
-      background: none;
-      border: none;
-      outline: none;
-      padding: 0;
-      font: inherit;
-      font-size: inherit;
-      font-weight: 600;
-    }
-    .text-link:hover {
-      color: #fff;
-      background: none;
-    }
-    .storage-actions { margin-top: 12px; }
-    button.btn-del {
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      outline: none;
-      padding: 2px 8px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      line-height: 1.2;
-      border-radius: 0;
-    }
-    button.btn-del:hover {
-      color: var(--bad);
-      background: transparent;
-    }
-    th.col-del, td.col-del { width: 2rem; text-align: center; padding-left: 0; padding-right: 0; }
-  </style>
+</style>
 </head>
 <body>
   <div class="wrap">
+    <p class="theme-badge">Светлая тема — только для просмотра</p>
     <h1>Учёт оплат за лёд</h1>
     <p class="sub">Вставьте список игроков в поле ниже, смотрите на планируемые и фактические суммы, отмечайте оплаты.</p>
 
-    <div class="games-bar card">
-      <div class="games-bar-grid">
-        <div class="games-field">
-          <label>Игра:</label>
-          <select id="gameSelect"></select>
-        </div>
-        <div class="games-bar-actions">
-          <button type="button" class="secondary" id="btnNewGame">+ Новая</button>
-          <button type="button" class="danger secondary" id="btnDeleteGame">Удалить</button>
-        </div>
-      </div>
+    <div class="games-bar card" style="margin-bottom:12px;padding:12px">
+      <label style="margin:0">Игра:</label>
+      <select id="gameSelect"></select>
+      <button type="button" class="primary-orange" id="btnNewGame">+ Новая</button>
+      <button type="button" class="danger secondary" id="btnDeleteGame">Удалить</button>
+      <button type="button" class="secondary" id="btnExport">Скачать копию</button>
+      <button type="button" class="secondary" id="btnImport">Загрузить копию</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
     <p class="save-status" id="saveStatus"></p>
 
@@ -268,7 +233,7 @@
     </div>
 
     <div class="card">
-      <h2>Данные для расчёта стоимости</h2>
+      <h2>Параметры игры</h2>
       <div class="grid grid-2">
         <div>
           <label>Площадка</label>
@@ -277,7 +242,6 @@
         <div>
           <label>Дата</label>
           <input type="date" id="gameDate">
-          <p class="field-hint" id="gameDateFormatted"></p>
         </div>
         <div>
           <label>Лёд, ₽/час</label>
@@ -297,7 +261,7 @@
         </div>
         <div>
           <label>План игроков (для расчёта в чате)</label>
-          <input type="number" id="planPlayers" value="20" min="1">
+          <input type="number" id="planPlayers" value="16" min="1">
         </div>
         <div>
           <label>Сумма с каждого (₽)</label>
@@ -308,18 +272,19 @@
       <p class="calc-hint">
         Итого: <strong id="hTotal">0 ₽</strong>
         (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
-        План (<span id="hPlanN">20</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
+        План (<span id="hPlanN">16</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
         Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
         К сбору: <strong id="hTarget">0 ₽</strong>
       </p>
     </div>
 
     <div class="card">
-      <h2>Список игроков</h2>
-      <label>Вставьте список игроков (данные с порядковыми номерами или без)</label>
-      <textarea id="pasteArea" placeholder="Игрок 1&#10;Игрок 2&#10;Игрок 3"></textarea>
+      <h2>Список из Telegram</h2>
+      <label>Вставьте сообщение целиком (имена с номерами или без)</label>
+      <textarea id="pasteArea" placeholder="Фамилия 1&#10;Фамилия 2&#10;Фамилия 3"></textarea>
       <div class="btn-row">
         <button type="button" id="btnParse">Разобрать список</button>
+        <button type="button" class="secondary" id="btnAddRow">+ Добавить игрока</button>
       </div>
     </div>
 
@@ -336,7 +301,6 @@
               <th>✓</th>
               <th>Внесено</th>
               <th>Коммент</th>
-              <th class="col-del"></th>
             </tr>
           </thead>
           <tbody id="playerBody"></tbody>
@@ -349,15 +313,10 @@
       <p class="storage-note">
         Все игры автоматически пишутся в <strong>память браузера</strong> (localStorage) на этом компьютере.
         При закрытии вкладки ничего не пропадает. Но если очистить историю/кэш браузера или открыть файл
-        на другом устройстве — данных там не будет. Раз в неделю сохраняйте резервную копию — файл
-        <code>.json</code> в папку «Загрузки».
+        на другом устройстве — данных там не будет. Поэтому раз в неделю нажимайте
+        <strong>«Скачать копию»</strong> — получите файл <code>.json</code> в папку «Загрузки».
+        Восстановить: <strong>«Загрузить копию»</strong>.
       </p>
-      <p class="storage-actions">
-        <button type="button" class="text-link" id="btnExport">Скачать копию</button>
-        ·
-        <button type="button" class="text-link" id="btnImport">Загрузить копию</button>
-      </p>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
   </div>
 
@@ -375,24 +334,6 @@
 
     function fmt(n) {
       return Math.round(n).toLocaleString('ru-RU') + ' ₽';
-    }
-
-    const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-
-    function formatGameDate(isoDate) {
-      if (!isoDate) return '?';
-      const d = new Date(isoDate + 'T12:00:00');
-      if (Number.isNaN(d.getTime())) return isoDate;
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yy = String(d.getFullYear()).slice(-2);
-      return dd + '.' + mm + '.' + yy + ' (' + WEEKDAYS[d.getDay()] + ')';
-    }
-
-    function updateDateFormatted() {
-      const el = document.getElementById('gameDateFormatted');
-      const raw = document.getElementById('gameDate').value;
-      el.textContent = raw ? formatGameDate(raw) : '';
     }
 
     function showSaved() {
@@ -429,7 +370,7 @@
         iceHour: 25000,
         duration: 1.25,
         goalies: 4500,
-        planPlayers: 20,
+        planPlayers: 16,
         chargePerPlayer: '',
         players: []
       };
@@ -442,7 +383,7 @@
     function renderGameSelect() {
       const sel = document.getElementById('gameSelect');
       sel.innerHTML = games.map(g => {
-        const label = formatGameDate(g.date) + ' — ' + (g.venue || 'Игра');
+        const label = (g.date || '?') + ' — ' + (g.venue || 'Игра');
         return `<option value="${g.id}">${label}</option>`;
       }).join('');
       sel.value = currentId;
@@ -494,7 +435,7 @@
       g.iceHour = Number(document.getElementById('iceHour').value) || 0;
       g.duration = Number(document.getElementById('duration').value) || 0;
       g.goalies = Number(document.getElementById('goalies').value) || 0;
-      g.planPlayers = Number(document.getElementById('planPlayers').value) || 20;
+      g.planPlayers = Number(document.getElementById('planPlayers').value) || 16;
       const chargeRaw = document.getElementById('chargePerPlayer').value.trim();
       g.chargePerPlayer = chargeRaw === '' ? '' : Number(chargeRaw);
       return g;
@@ -633,8 +574,6 @@
       tr.querySelector('[data-f=paid]').disabled = !hasName;
       tr.querySelector('[data-f=amount]').disabled = !hasName;
       tr.querySelector('[data-f=comment]').disabled = !hasName;
-      const delBtn = tr.querySelector('.btn-del');
-      if (delBtn) delBtn.style.visibility = hasName ? 'visible' : 'hidden';
     }
 
     function trimTrailingEmpty(g) {
@@ -671,7 +610,6 @@
           <td><input type="checkbox" class="chk" data-f="paid" ${p.paid ? 'checked' : ''} ${!(p.name || '').trim() ? 'disabled' : ''}></td>
           <td><input type="text" inputmode="numeric" class="amt" data-f="amount" value="${amtVal !== '' ? esc(String(amtVal)) : ''}" placeholder="${due || ''}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
           <td><input type="text" class="cmt" data-f="comment" value="${esc(p.comment)}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
-          <td class="col-del">${hasName ? '<button type="button" class="btn-del" title="Удалить игрока">удалить</button>' : ''}</td>
         </tr>`;
       }).join('');
     }
@@ -698,18 +636,9 @@
           const prevTrimmed = (p.name || '').trim();
           p.name = inp.value;
           if (!prevTrimmed && inp.value.trim() && i === g.players.length - 1 && filledPlayers(g).length < MAX_PLAYERS) {
-            const caret = inp.selectionStart;
-            const editIdx = i;
             g.players.push(emptyPlayer());
             save();
             renderPlayers(g);
-            const focusTr = tbody.querySelector(`tr[data-i="${editIdx}"]`);
-            const focusInp = focusTr?.querySelector('[data-f=name]');
-            if (focusInp) {
-              focusInp.focus();
-              const pos = Math.min(caret, focusInp.value.length);
-              focusInp.setSelectionRange(pos, pos);
-            }
             updateDashboard();
             return;
           }
@@ -735,19 +664,6 @@
         save();
         updateDashboard();
       });
-
-      tbody.addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-del');
-        if (!btn) return;
-        const tr = btn.closest('tr');
-        const g = currentGame();
-        const i = +tr.dataset.i;
-        g.players.splice(i, 1);
-        normalizePlayers(g);
-        save();
-        renderPlayers(g);
-        updateDashboard();
-      });
     }
 
     function persistCurrentGame() {
@@ -763,13 +679,12 @@
       document.getElementById('iceHour').value = g.iceHour ?? 25000;
       document.getElementById('duration').value = String(g.duration ?? 1.25);
       document.getElementById('goalies').value = g.goalies ?? 4500;
-      document.getElementById('planPlayers').value = g.planPlayers ?? 20;
+      document.getElementById('planPlayers').value = g.planPlayers ?? 16;
       const charge = g.chargePerPlayer;
       document.getElementById('chargePerPlayer').value =
         charge !== '' && charge != null && !Number.isNaN(Number(charge)) ? charge : '';
       renderPlayers(g);
       updateDashboard();
-      updateDateFormatted();
     }
 
     function onParamsChange() {
@@ -777,7 +692,6 @@
       save();
       updateDueCells();
       updateDashboard();
-      updateDateFormatted();
       renderGameSelect();
     }
 
@@ -830,6 +744,21 @@
       updateDashboard();
     });
 
+    document.getElementById('btnAddRow').addEventListener('click', () => {
+      const g = currentGame();
+      normalizePlayers(g);
+      const last = g.players[g.players.length - 1];
+      if ((last.name || '').trim()) {
+        if (filledPlayers(g).length < MAX_PLAYERS) g.players.push(emptyPlayer());
+      }
+      save();
+      renderPlayers(g);
+      updateDashboard();
+      const inputs = document.querySelectorAll('#playerBody tr.add-row input.name-inp');
+      const inp = inputs[inputs.length - 1];
+      if (inp) inp.focus();
+    });
+
     document.getElementById('btnNewGame').addEventListener('click', () => {
       persistCurrentGame();
       const ng = newGameData();
@@ -853,10 +782,8 @@
     });
 
     document.getElementById('gameSelect').addEventListener('change', e => {
-      const nextId = e.target.value;
       persistCurrentGame();
-      currentId = nextId;
-      renderGameSelect();
+      currentId = e.target.value;
       applyGame(currentGame());
     });
 
