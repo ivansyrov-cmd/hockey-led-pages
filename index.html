@@ -311,7 +311,7 @@
         (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
         План (<span id="hPlanN">20</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
         Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
-        К сбору: <strong id="hTarget">0 ₽</strong>
+        Будет собрано: <strong id="hTarget">0 ₽</strong>
       </p>
     </div>
 
@@ -493,6 +493,7 @@
       const autoFact = n > 0 ? Math.round(expense / n) : 0;
       const baseFact = fixed != null ? fixed : autoFact;
       const plan = g.planPlayers > 0 ? Math.round(expense / g.planPlayers) : 0;
+      const collectionTarget = fixed != null ? fixed * n : expense;
 
       let collected = 0;
       let fixedUnpaidTotal = 0;
@@ -523,7 +524,8 @@
         }
       });
 
-      const remaining = Math.max(0, expense - collected - fixedUnpaidTotal);
+      const poolTarget = fixed != null ? collectionTarget : expense;
+      const remaining = Math.max(0, poolTarget - collected - fixedUnpaidTotal);
       const shares = splitEven(remaining, equalSplitIndices.length);
       equalSplitIndices.forEach((idx, ui) => { dues[idx] = shares[ui]; });
 
@@ -551,7 +553,7 @@
         perUnpaid, dues,
         n, collected, left: expense - collected,
         surplus: collected > expense ? collected - expense : 0,
-        targetCollection: collected + shares.reduce((a, b) => a + b, 0) + fixedUnpaidTotal,
+        targetCollection: collectionTarget,
         debtors, players
       };
     }
