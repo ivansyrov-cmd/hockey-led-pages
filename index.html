@@ -325,12 +325,12 @@
       </div>
       <div class="calc-hint">
         <p class="calc-hint-line">
-          План: <strong id="hTotal">0 ₽</strong>
+          Стоимость льда: <strong id="hTotal">0 ₽</strong>
           (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
-          План (<span id="hPlanN">20</span> чел): <strong id="hPlan">0 ₽</strong>/чел ·
+          Игроков по плану (<span id="hPlanN">20</span>): <strong id="hPlan">0 ₽</strong>/чел ·
         </p>
         <p class="calc-hint-line">
-          Факт (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
+          Факт в списке (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
           Будет собрано: <strong id="hTarget">0 ₽</strong> ·
           разница составит <strong id="hDiff">0 ₽</strong>
         </p>
@@ -500,13 +500,9 @@
       return Number.isNaN(num) ? null : num;
     }
 
-    function splitEven(total, count) {
-      if (count <= 0) return [];
-      const abs = Math.abs(Math.round(total));
-      const base = Math.floor(abs / count);
-      const rem = abs - base * count;
-      const sign = total < 0 ? -1 : 1;
-      return Array.from({ length: count }, (_, i) => sign * (base + (i < rem ? 1 : 0)));
+    function sharePerPlayer(total, count) {
+      if (count <= 0) return 0;
+      return Math.ceil(total / count);
     }
 
     function dueForIndex(g, i) {
@@ -520,9 +516,9 @@
       const players = filledPlayers(g);
       const n = players.length;
       const fixed = getChargePerPlayer(g);
-      const autoFact = n > 0 ? Math.round(expense / n) : 0;
+      const autoFact = n > 0 ? sharePerPlayer(expense, n) : 0;
       const baseFact = fixed != null ? fixed : autoFact;
-      const plan = g.planPlayers > 0 ? Math.round(expense / g.planPlayers) : 0;
+      const plan = g.planPlayers > 0 ? sharePerPlayer(expense, g.planPlayers) : 0;
       const collectionTarget = fixed != null ? fixed * n : expense;
 
       let collected = 0;
@@ -556,8 +552,9 @@
 
       const poolTarget = fixed != null ? collectionTarget : expense;
       const remaining = Math.max(0, poolTarget - collected - fixedUnpaidTotal);
-      const shares = splitEven(remaining, equalSplitIndices.length);
-      equalSplitIndices.forEach((idx, ui) => { dues[idx] = shares[ui]; });
+      const currentShare = equalSplitIndices.length > 0
+        ? sharePerPlayer(remaining, equalSplitIndices.length)
+        : baseFact;
 
       g.players.forEach((p, i) => {
         if (!(p.name || '').trim()) return;
@@ -567,16 +564,13 @@
           return;
         }
 
-        if (p.paid) {
-          const num = paymentNum(p);
-          dues[i] = num != null ? num : (p.owedWhenPaid != null ? p.owedWhenPaid : baseFact);
-        }
+        dues[i] = currentShare;
       });
 
       let debtors = 0;
       players.forEach(p => { if (!p.paid) debtors++; });
 
-      const perUnpaid = shares.length ? shares[0] : baseFact;
+      const perUnpaid = currentShare;
 
       return {
         iceCost, goalieCost, expense, plan, fact: baseFact, autoFact, fixed,
@@ -666,7 +660,7 @@
       document.getElementById('hGoalies').textContent = fmt(t.goalieCost);
       document.getElementById('hPlanN').textContent = g.planPlayers;
       document.getElementById('hPlan').textContent = fmt(t.plan);
-      document.getElementById('hFact').textContent = fmt(t.fact);
+      document.getElementById('hFact').textContent = fmt(t.perUnpaid);
       document.getElementById('hFactN').textContent = t.n;
       document.getElementById('hTarget').textContent = fmt(t.targetCollection);
       const diff = t.targetCollection - t.expense;
