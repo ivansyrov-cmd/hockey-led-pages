@@ -519,11 +519,9 @@
       const autoFact = n > 0 ? sharePerPlayer(expense, n) : 0;
       const baseFact = fixed != null ? fixed : autoFact;
       const plan = g.planPlayers > 0 ? sharePerPlayer(expense, g.planPlayers) : 0;
-      const collectionTarget = fixed != null ? fixed * n : expense;
+      const collectionTarget = baseFact * n;
 
       let collected = 0;
-      let fixedUnpaidTotal = 0;
-      const equalSplitIndices = [];
       const dues = {};
 
       g.players.forEach((p, i) => {
@@ -533,49 +531,28 @@
         }
 
         if (p.dueOverride != null) {
+          dues[i] = p.dueOverride;
           if (p.paid) {
             const num = paymentNum(p);
-            if (num != null) collected += num;
-          } else {
-            fixedUnpaidTotal += p.dueOverride;
+            collected += num != null ? num : p.dueOverride;
           }
           return;
         }
 
+        dues[i] = baseFact;
         if (p.paid) {
           const num = paymentNum(p);
-          if (num != null) collected += num;
-        } else {
-          equalSplitIndices.push(i);
+          collected += num != null ? num : baseFact;
         }
-      });
-
-      const poolTarget = fixed != null ? collectionTarget : expense;
-      const remaining = Math.max(0, poolTarget - collected - fixedUnpaidTotal);
-      const currentShare = equalSplitIndices.length > 0
-        ? sharePerPlayer(remaining, equalSplitIndices.length)
-        : baseFact;
-
-      g.players.forEach((p, i) => {
-        if (!(p.name || '').trim()) return;
-
-        if (p.dueOverride != null) {
-          dues[i] = p.dueOverride;
-          return;
-        }
-
-        dues[i] = currentShare;
       });
 
       let debtors = 0;
       players.forEach(p => { if (!p.paid) debtors++; });
 
-      const perUnpaid = currentShare;
-
       return {
         iceCost, goalieCost, expense, plan, fact: baseFact, autoFact, fixed,
-        perUnpaid, dues,
-        n, collected, left: expense - collected,
+        perUnpaid: baseFact, dues,
+        n, collected, left: collectionTarget - collected,
         surplus: collected > expense ? collected - expense : 0,
         targetCollection: collectionTarget,
         debtors, players
