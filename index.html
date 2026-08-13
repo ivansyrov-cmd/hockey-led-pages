@@ -234,6 +234,8 @@
       background: none;
     }
     .storage-actions { margin-top: 12px; }
+    .share-row { margin-bottom: 12px; }
+    .share-status { font-size: 0.8rem; color: var(--ok); margin-left: 4px; }
     button.btn-del {
       background: transparent;
       color: var(--muted);
@@ -349,6 +351,11 @@
 
     <div class="card">
       <h2>Оплаты</h2>
+      <div class="btn-row share-row">
+        <button type="button" class="secondary" id="btnPrint">Печать / PDF</button>
+        <button type="button" class="secondary" id="btnTelegram">Скопировать в Telegram</button>
+        <span class="share-status" id="shareStatus"></span>
+      </div>
       <p class="debtors-summary" id="debtorsSummary"><span class="count">Не оплатили (0):</span> <span id="debtorsSummaryNames">—</span></p>
       <div class="table-wrap">
         <table>
@@ -377,6 +384,10 @@
         <code>.json</code> в папку «Загрузки».
       </p>
       <p class="storage-actions">
+        <button type="button" class="text-link" id="btnPrintCopy">Печать / PDF</button>
+        ·
+        <button type="button" class="text-link" id="btnTelegramCopy">Скопировать в Telegram</button>
+        ·
         <button type="button" class="text-link" id="btnExport">Скачать копию</button>
         ·
         <button type="button" class="text-link" id="btnImport">Загрузить копию</button>
@@ -939,6 +950,172 @@
       });
     }
 
+    function durationLabel(v) {
+      const n = Number(v);
+      if (n === 1) return '1 час';
+      if (n === 1.25) return '1 час 15 минут';
+      if (n === 1.5) return '1 час 30 минут';
+      return String(v);
+    }
+
+    function leftoverLabel(t) {
+      if (t.left > 0) return '−' + fmt(t.left);
+      if (t.left < 0) return '+' + fmt(t.surplus);
+      return '0 ₽';
+    }
+
+    function reportPlayers(g, t) {
+      return filledPlayers(g).map((p, i) => {
+        const idx = g.players.indexOf(p);
+        const due = t.dues[idx];
+        const paidAmt = paymentNum(p);
+        return {
+          num: i + 1,
+          name: (p.name || '').trim(),
+          due: due !== '' && due != null ? due : t.fact,
+          paid: !!p.paid,
+          amount: paidAmt,
+          comment: (p.comment || '').trim()
+        };
+      });
+    }
+
+    function formatTelegramText(g) {
+      persistCurrentGame();
+      g = currentGame();
+      const t = calcTotals(g);
+      const rows = reportPlayers(g, t);
+      const unpaid = rows.filter(r => !r.paid).map(r => r.name);
+      const lines = [];
+      lines.push(formatGameDate(g.date) + ' — ' + (g.venue || 'Игра'));
+      lines.push('Лёд: ' + fmt(t.iceCost) + ' · Вратари: ' + fmt(t.goalieCost) + ' · ' + durationLabel(g.duration));
+      lines.push('Нужно: ' + fmt(t.expense));
+      lines.push('Собрано: ' + fmt(t.collected));
+      lines.push('Осталось: ' + leftoverLabel(t));
+      lines.push('Будет собрано: ' + fmt(t.targetCollection));
+      lines.push('');
+      if (unpaid.length) {
+        lines.push('Не оплатили (' + unpaid.length + '): ' + unpaid.join(', '));
+      } else {
+        lines.push('Не оплатили (0): все оплатили');
+      }
+      lines.push('');
+      rows.forEach(r => {
+        let line = r.num + '. ' + r.name + ' — ' + fmt(r.due);
+        if (r.paid) {
+          line += ' ✓';
+          if (r.amount != null) line += ' ' + r.amount;
+        }
+        if (r.comment) line += ' (' + r.comment + ')';
+        lines.push(line);
+      });
+      return lines.join('\n');
+    }
+
+    function showShareStatus(msg) {
+      const el = document.getElementById('shareStatus');
+      el.textContent = msg;
+      clearTimeout(showShareStatus._t);
+      showShareStatus._t = setTimeout(() => { el.textContent = ''; }, 2500);
+    }
+
+    function copyTelegram() {
+      const text = formatTelegramText(currentGame());
+      const done = () => showShareStatus('Скопировано');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => copyTelegramFallback(text, done));
+      } else {
+        copyTelegramFallback(text, done);
+      }
+    }
+
+    function copyTelegramFallback(text, done) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); }
+      catch (_) { alert(text); }
+      document.body.removeChild(ta);
+    }
+
+    function printGameReport() {
+      persistCurrentGame();
+      const g = currentGame();
+      const t = calcTotals(g);
+      const rows = reportPlayers(g, t);
+      const unpaid = rows.filter(r => !r.paid).map(r => r.name);
+      const unpaidLine = unpaid.length
+        ? 'Не оплатили (' + unpaid.length + '): ' + unpaid.join(', ')
+        : 'Не оплатили (0): все оплатили';
+      const tableRows = rows.map(r => {
+        return '<tr>' +
+          '<td>' + r.num + '</td>' +
+          '<td>' + esc(r.name) + '</td>' +
+          '<td>' + fmt(r.due) + '</td>' +
+          '<td>' + (r.paid ? 'да' : '') + '</td>' +
+          '<td>' + (r.amount != null ? esc(String(r.amount)) : '') + '</td>' +
+          '<td>' + esc(r.comment) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Оплаты — ${esc(formatGameDate(g.date))}</title>
+  <style>
+    body { font-family: "Segoe UI", system-ui, sans-serif; color: #111; margin: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: #555; margin-bottom: 16px; }
+    .dash { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .dash div { border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; min-width: 120px; }
+    .dash .lbl { font-size: 11px; text-transform: uppercase; color: #666; }
+    .dash .val { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .unpaid { margin-bottom: 14px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { font-size: 11px; text-transform: uppercase; color: #555; }
+    .hint { margin-top: 18px; font-size: 12px; color: #777; }
+    @media print { body { margin: 12mm; } .hint { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>Учёт оплат за лёд</h1>
+  <p class="sub">${esc(formatGameDate(g.date))} — ${esc(g.venue || 'Игра')} · ${esc(durationLabel(g.duration))}</p>
+  <div class="dash">
+    <div><div class="lbl">Нужно</div><div class="val">${fmt(t.expense)}</div></div>
+    <div><div class="lbl">Собрано</div><div class="val">${fmt(t.collected)}</div></div>
+    <div><div class="lbl">Осталось</div><div class="val">${leftoverLabel(t)}</div></div>
+    <div><div class="lbl">Не оплатили</div><div class="val">${t.debtors}</div></div>
+  </div>
+  <p class="unpaid">${esc(unpaidLine)}</p>
+  <table>
+    <thead>
+      <tr><th>№</th><th>Игрок</th><th>Сумма</th><th>Оплатил</th><th>Внесено</th><th>Коммент</th></tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <p class="hint">В окне печати выберите «Сохранить как PDF», если нужен файл.</p>
+</body>
+</html>`;
+
+      const w = window.open('', '_blank');
+      if (!w) {
+        alert('Разрешите всплывающие окна, чтобы открыть печать.');
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => {
+        w.print();
+      }, 250);
+    }
+
     function exportBackup() {
       persistCurrentGame();
       const blob = new Blob([JSON.stringify(games, null, 2)], { type: 'application/json' });
@@ -1009,6 +1186,11 @@
       renderGameSelect();
       applyGame(currentGame());
     });
+
+    document.getElementById('btnPrint').addEventListener('click', printGameReport);
+    document.getElementById('btnTelegram').addEventListener('click', copyTelegram);
+    document.getElementById('btnPrintCopy').addEventListener('click', printGameReport);
+    document.getElementById('btnTelegramCopy').addEventListener('click', copyTelegram);
 
     document.getElementById('btnExport').addEventListener('click', exportBackup);
 
