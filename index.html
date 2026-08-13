@@ -113,10 +113,11 @@
     .dash-item.need .val { color: var(--accent); }
     #dNeed { color: var(--accent); }
     .dash-item.collected .val { color: var(--ok); }
-    .dash-item.left.deficit .val { color: var(--warn); }
+    .dash-item.left.deficit .val { color: var(--bad); }
     .dash-item.left.surplus .val { color: var(--ok); }
     .dash-item.left.exact .val { color: var(--ok); }
     .dash-item.debtors .val { color: var(--bad); }
+    .dash-item.debtors.all-paid .val { color: var(--ok); }
     .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     button {
       background: var(--accent);
@@ -621,7 +622,7 @@
       const leftBox = leftEl.closest('.dash-item');
       leftBox.classList.remove('deficit', 'surplus', 'exact');
       if (t.left > 0) {
-        leftEl.textContent = fmt(t.left);
+        leftEl.textContent = '−' + fmt(t.left);
         leftBox.classList.add('deficit');
       } else if (t.left < 0) {
         leftEl.textContent = '+' + fmt(t.surplus);
@@ -631,7 +632,9 @@
         leftBox.classList.add('exact');
       }
 
-      document.getElementById('dDebtors').textContent = t.debtors;
+      const debtorsEl = document.getElementById('dDebtors');
+      debtorsEl.textContent = t.debtors;
+      debtorsEl.closest('.dash-item').classList.toggle('all-paid', t.debtors === 0);
       document.getElementById('hTotal').textContent = fmt(t.expense);
       document.getElementById('hIce').textContent = fmt(t.iceCost);
       document.getElementById('hGoalies').textContent = fmt(t.goalieCost);
