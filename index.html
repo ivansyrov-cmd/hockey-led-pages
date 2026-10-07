@@ -1,1211 +1,485 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Учёт оплат за лёд</title>
-  <style>
-    :root {
-      --bg: #0f1419;
-      --surface: #1a2332;
-      --surface2: #243044;
-      --border: #2d3f56;
-      --text: #e8edf4;
-      --muted: #8fa3bc;
-      --accent: #3b82f6;
-      --accent-dim: #2563eb;
-      --ok: #22c55e;
-      --warn: #f59e0b;
-      --bad: #ef4444;
-      --dash-ok: #14532d;
-      --dash-warn: #713f12;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-    }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 1.35rem; margin-bottom: 4px; }
-    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
-    .grid { display: grid; gap: 12px; }
-    .grid-2 { grid-template-columns: 1fr 1fr; }
-    .grid-4 { grid-template-columns: repeat(4, 1fr); }
-    @media (max-width: 700px) {
-      .grid-2, .grid-4 { grid-template-columns: 1fr; }
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    .card h2 {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
-    label {
-      display: block;
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-    input, select, textarea {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: 1rem;
-    }
-    input:focus, textarea:focus, select:focus {
-      outline: 2px solid var(--accent);
-      border-color: transparent;
-    }
-    select {
-      color-scheme: dark;
-    }
-    input[type="date"]::-webkit-calendar-picker-indicator {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 0.95em;
-      height: 0.95em;
-      margin-left: 2px;
-      cursor: pointer;
-      opacity: 0.85;
-      background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e8edf4' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='1.5'/%3E%3Cline x1='8' y1='3' x2='8' y2='6'/%3E%3Cline x1='16' y1='3' x2='16' y2='6'/%3E%3Cline x1='4' y1='9' x2='20' y2='9'/%3E%3C/svg%3E");
-    }
-    textarea { min-height: 120px; resize: vertical; font-family: inherit; }
-    .dash {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    @media (max-width: 600px) { .dash { grid-template-columns: 1fr 1fr; } }
-    .dash-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      text-align: center;
-    }
-    .dash-item .val {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-top: 4px;
-    }
-    .dash-item .sub-val {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-top: 6px;
-      line-height: 1.35;
-    }
-    .dash-item .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
-    .dash-item.need .val { color: var(--accent); }
-    #dNeed { color: var(--accent); }
-    .dash-item.collected .val { color: var(--ok); }
-    .dash-item.left.deficit .val { color: var(--bad); }
-    .dash-item.left.surplus .val { color: var(--ok); }
-    .dash-item.left.exact .val { color: var(--ok); }
-    .dash-item.debtors .val { color: var(--bad); }
-    .dash-item.debtors.all-paid .val { color: var(--ok); }
-    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button:hover { background: var(--accent-dim); }
-    button.secondary {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    button.danger { background: #7f1d1d; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
-    th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
-    tr.unpaid td.name { color: var(--warn); }
-    tr.paid td.name { color: var(--ok); }
-    tr.empty { opacity: 0.35; }
-    .chk { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
-    .amt { width: 90px; padding: 6px 8px; font-size: 0.9rem; }
-    .cmt { width: 100%; min-width: 80px; padding: 6px 8px; font-size: 0.85rem; }
-    .debtors-list {
-      margin-top: 10px;
-      padding: 10px 12px;
-      background: var(--dash-warn);
-      border-radius: 8px;
-      font-size: 0.9rem;
-    }
-    .debtors-list.all-paid {
-      background: var(--dash-ok);
-    }
-    .debtors-list .debtors-title { font-weight: 700; margin-right: 6px; }
-    .debtors-summary {
-      font-size: 0.95rem;
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      background: var(--surface2);
-      border-radius: 8px;
-      border-left: 3px solid var(--warn);
-    }
-    .debtors-summary.all-paid { border-left-color: var(--ok); }
-    .debtors-summary .count { font-weight: 700; color: var(--warn); }
-    .debtors-summary.all-paid .count { color: var(--ok); }
-    tr.add-row { opacity: 0.55; }
-    tr.add-row input.name-inp::placeholder { color: var(--muted); font-style: italic; }
-    .games-bar.card {
-      margin-bottom: 10px;
-    }
-    .games-bar-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      align-items: center;
-    }
-    .games-field {
-      grid-column: 1 / 3;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-width: 0;
-    }
-    .games-field label {
-      margin: 0;
-      flex-shrink: 0;
-    }
-    .games-field select {
-      flex: 1;
-      min-width: 0;
-      width: 100%;
-    }
-    .games-bar-actions {
-      grid-column: 3 / 5;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    @media (max-width: 600px) {
-      .games-bar-grid { grid-template-columns: 1fr; }
-      .games-field,
-      .games-bar-actions { grid-column: 1 / -1; }
-    }
-    .calc-hint { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
-    .calc-hint-line { margin: 0; }
-    .calc-hint-line + .calc-hint-line { margin-top: 6px; }
-    .calc-hint strong { color: var(--text); }
-    .calc-hint .diff-pos { color: var(--ok); }
-    .calc-hint .diff-neg { color: var(--warn); }
-    .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
-    .table-wrap { overflow-x: auto; }
-    .storage-note { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
-    .save-status { font-size: 0.8rem; color: var(--ok); margin-top: 10px; min-height: 1.2em; }
-    td.due-cell { color: var(--muted); white-space: nowrap; }
-    .text-link {
-      color: var(--accent);
-      text-decoration: underline;
-      cursor: pointer;
-      background: none;
-      border: none;
-      outline: none;
-      padding: 0;
-      font: inherit;
-      font-size: inherit;
-      font-weight: 600;
-    }
-    .text-link:hover {
-      color: #fff;
-      background: none;
-    }
-    .storage-actions { margin-top: 12px; }
-    .share-row { margin-bottom: 12px; }
-    .share-status { font-size: 0.8rem; color: var(--ok); margin-left: 4px; }
-    button.btn-del {
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      outline: none;
-      padding: 2px 8px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      line-height: 1.2;
-      border-radius: 0;
-    }
-    button.btn-del:hover {
-      color: var(--bad);
-      background: transparent;
-    }
-    th.col-del, td.col-del { width: 2rem; text-align: center; padding-left: 0; padding-right: 0; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Учёт оплат за лёд</h1>
-    <p class="sub">Вставьте список игроков в поле ниже, смотрите на планируемые и фактические суммы, отмечайте оплаты.</p>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#c8102e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Тренировки">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23eaf0f5'/%3E%3Crect x='12' y='8' width='6' height='48' rx='3' fill='%231f4fa3'/%3E%3Crect x='29' y='8' width='6' height='48' rx='3' fill='%23c8102e'/%3E%3Crect x='46' y='8' width='6' height='48' rx='3' fill='%231f4fa3'/%3E%3C/svg%3E">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Тренировки между играми</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Golos+Text:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first card, sticky rink-line tab bar, one section per tab, rest timer docked at the bottom */
+:root{
+  --bg:#eaf0f5; --surface:#ffffff; --fg:#0f1c2a; --muted:#5a6a7b; --line:#d2dce5;
+  --red:#c8102e; --blue:#1f4fa3; --blue-soft:#e3ebf8; --red-soft:#fbe7ea;
+  --go:#1d7a46; --go-soft:#e2f3e9; --warn:#a86a00; --warn-soft:#fbf0d9; --stop:#b3122b; --stop-soft:#fbe4e8;
+  --display:"Russo One","Arial Narrow",Impact,sans-serif;
+  --body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1219; --surface:#131d28; --fg:#e5ecf2; --muted:#93a3b3; --line:#243241;
+    --red:#ff5d70; --blue:#7fa8ff; --blue-soft:#18253a; --red-soft:#3a1820;
+    --go:#5fd393; --go-soft:#123224; --warn:#f2b84b; --warn-soft:#352a12; --stop:#ff6b7f; --stop-soft:#3a1720;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1219; --surface:#131d28; --fg:#e5ecf2; --muted:#93a3b3; --line:#243241;
+  --red:#ff5d70; --blue:#7fa8ff; --blue-soft:#18253a; --red-soft:#3a1820;
+  --go:#5fd393; --go-soft:#123224; --warn:#f2b84b; --warn-soft:#352a12; --stop:#ff6b7f; --stop-soft:#3a1720;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:16px;padding-block:0 calc(170px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:640px;margin:0 auto}
+header.top{padding-block:20px 12px;display:grid;gap:6px}
+.rink{height:6px;display:grid;grid-template-columns:1fr 6px 1fr 6px 1fr;gap:10%;margin-bottom:6px}
+.rink i{display:block;border-radius:3px}
+.rink i:nth-child(1),.rink i:nth-child(5){background:var(--blue)}
+.rink i:nth-child(3){background:var(--red)}
+h1{font-family:var(--display);font-weight:400;font-size:1.7rem;line-height:1.1;margin:0;text-wrap:balance;letter-spacing:.01em}
+.sub{color:var(--muted);margin:0;font-size:.95rem}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin-inline:-16px;padding:8px 16px;border-bottom:2px solid var(--red);overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+.tabrow{display:flex;gap:6px;width:max-content}
+.tab{font:600 .9rem/1 var(--body);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:9px 12px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.tab b{font-family:var(--display);font-weight:400;color:var(--blue);margin-right:4px}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tab[aria-selected="true"] b{color:var(--bg)}
+.tab:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+section{padding-block:18px 8px;display:grid;gap:16px}
+h2{font-family:var(--display);font-weight:400;font-size:1.35rem;margin:0;line-height:1.15;text-wrap:balance}
+h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:700}
+p{margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--blue-soft);color:var(--blue)}
+.chip.red{background:var(--red-soft);color:var(--red)}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:10px}
+.note{font-size:.92rem;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:3px;gap:3px}
+.seg button{font:600 .88rem/1 var(--body);border:0;background:transparent;color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--blue);color:#fff}
+.switch{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.switch span{font-weight:600;font-size:.92rem}
+/* week */
+.week{display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.day{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:12px 14px;border-top:1px solid var(--line);align-items:start}
+.day:first-child{border-top:0}
+.dname{font-family:var(--display);font-size:1.05rem;color:var(--muted)}
+.day.game .dname{color:var(--red)}
+.day.train .dname{color:var(--blue)}
+.dwhat{font-weight:600;min-width:0}
+.dwhat small{display:block;font-weight:400;color:var(--muted);font-size:.86rem}
+.day button.go{margin-top:6px;font:600 .82rem/1 var(--body);background:var(--blue-soft);color:var(--blue);border:0;padding:7px 10px;border-radius:8px;cursor:pointer}
+/* exercises */
+ol.ex,ul.ex{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.ex li{border-top:1px solid var(--line)}
+.ex li:first-child{border-top:0}
+.ex label{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;cursor:pointer;align-items:start}
+.ex input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--blue)}
+.ex .n{font-weight:600;display:block}
+.ex .d{display:block;color:var(--muted);font-size:.88rem}
+.ex .tag{font-family:var(--display);color:var(--blue);margin-right:6px}
+.ex input:checked ~ span .n{text-decoration:line-through;color:var(--muted)}
+.rowbtn{display:flex;justify-content:flex-end}
+.reset{font:600 .82rem/1 var(--body);background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:8px;cursor:pointer}
+.how{margin:-4px 0 10px 36px;font-size:.84rem;line-height:1.45;color:var(--muted)}
+.how .links{display:inline-flex;flex-wrap:wrap;gap:4px 10px;margin-left:2px}
+.how a{color:var(--blue);font-weight:600;text-decoration:none;white-space:nowrap}
+.how a:hover,.how a:focus-visible{text-decoration:underline}
+/* lights */
+.light{border-radius:14px;padding:14px;display:grid;grid-template-columns:14px 1fr;gap:12px;border:1px solid var(--line)}
+.light i{width:14px;height:14px;border-radius:50%;margin-top:5px}
+.light.g{background:var(--go-soft)} .light.g i{background:var(--go)}
+.light.y{background:var(--warn-soft)} .light.y i{background:var(--warn)}
+.light.r{background:var(--stop-soft)} .light.r i{background:var(--stop)}
+.light strong{display:block}
+.pace{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pace div{background:var(--blue-soft);border-radius:10px;padding:10px;display:grid;gap:2px}
+.pace b{font-family:var(--display);font-weight:400;font-size:1.2rem;color:var(--blue);font-variant-numeric:tabular-nums}
+.pace span{font-size:.78rem;color:var(--muted)}
+ul.plain{margin:0;padding-left:18px;display:grid;gap:6px}
+/* timer */
+.timer{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:2px solid var(--red);padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,0,0,.08)}
+.timer .in{max-width:640px;margin:0 auto;display:grid;gap:8px}
+.timer .top{display:flex;justify-content:center;text-align:center}
+.clock{font-family:var(--display);font-size:clamp(2rem,9vw,2.6rem);line-height:1;font-variant-numeric:tabular-nums}
+.clock.done{color:var(--red)}
+.tbtns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tbtns button{font:700 clamp(1.15rem,5vw,1.4rem)/1 var(--display);min-height:clamp(56px,9vh,72px);border:2px solid var(--line);background:var(--bg);color:var(--fg);border-radius:14px;cursor:pointer;font-variant-numeric:tabular-nums;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tbtns button small{display:block;font:500 .7rem/1.2 var(--body);color:var(--muted);margin-top:3px}
+.tbtns button:active{transform:scale(.97)}
+.tbtns button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.tbtns button.on small{color:#fff}
+.tbtns button.stop{color:var(--red);border-color:var(--red);font-family:var(--body);font-size:clamp(1rem,4.4vw,1.2rem)}
+.tlabel{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+@media (prefers-reduced-motion:no-preference){.tab,.seg button{transition:background .15s,color .15s}}
+</style>
+</head><body>
 
-    <div class="games-bar card">
-      <div class="games-bar-grid">
-        <div class="games-field">
-          <label>Игра:</label>
-          <select id="gameSelect"></select>
-        </div>
-        <div class="games-bar-actions">
-          <button type="button" class="secondary" id="btnNewGame">+ Новая</button>
-          <button type="button" class="danger secondary" id="btnDeleteGame">Удалить</button>
-        </div>
-      </div>
-    </div>
-    <p class="save-status" id="saveStatus"></p>
+<div class="wrap">
+<header class="top">
+  <div class="rink" aria-hidden="true"><i></i><span></span><i></i><span></span><i></i></div>
+  <h1>Тренировки между играми</h1>
+  <p class="sub">Сезон до весны: держим форму, растим силу и выносливость. 40 минут, двор и стадион.</p>
+</header>
 
-    <div class="dash">
-      <div class="dash-item need">
-        <div class="lbl">Нужно (расход)</div>
-        <div class="val" id="dNeed">0 ₽</div>
-        <div class="sub-val" id="dNeedBreak">лёд: — · вратари: —</div>
-      </div>
-      <div class="dash-item collected"><div class="lbl">Собрано</div><div class="val" id="dCollected">0 ₽</div></div>
-      <div class="dash-item left deficit"><div class="lbl">Осталось</div><div class="val" id="dLeft">0 ₽</div></div>
-      <div class="dash-item debtors"><div class="lbl">Не оплатили</div><div class="val" id="dDebtors">0</div></div>
-    </div>
-    <div class="debtors-list" id="debtorsList">
-      <span class="debtors-title" id="debtorsTitle">Не оплатили (0):</span>
-      <span id="debtorsNames">—</span>
-    </div>
+<nav class="tabs" aria-label="Разделы">
+  <div class="tabrow" role="tablist">
+    <button class="tab" role="tab" data-tab="week" id="t-week">Неделя</button>
+    <button class="tab" role="tab" data-tab="a" id="t-a"><b>А</b>Сила</button>
+    <button class="tab" role="tab" data-tab="b" id="t-b"><b>Б</b>Скорость</button>
+    <button class="tab" role="tab" data-tab="c" id="t-c"><b>В</b>Выносливость</button>
+    <button class="tab" role="tab" data-tab="mob" id="t-mob">Пн вечер</button>
+    <button class="tab" role="tab" data-tab="ready" id="t-ready">Готовность</button>
+    <button class="tab" role="tab" data-tab="food" id="t-food">Питание</button>
+  </div>
+</nav>
 
-    <div class="card">
-      <h2>Данные для расчёта стоимости</h2>
-      <div class="grid grid-2">
-        <div>
-          <label>Площадка</label>
-          <input type="text" id="venue" value="СК Молодежка">
-        </div>
-        <div>
-          <label>Дата</label>
-          <input type="date" id="gameDate">
-          <p class="field-hint" id="gameDateFormatted"></p>
-        </div>
-        <div>
-          <label>Лёд, ₽/час</label>
-          <input type="number" id="iceHour" value="25000" min="0" step="100">
-        </div>
-        <div>
-          <label>Длительность</label>
-          <select id="duration">
-            <option value="1">1 час</option>
-            <option value="1.25" selected>1 час 15 минут</option>
-            <option value="1.5">1 час 30 минут</option>
-          </select>
-        </div>
-        <div>
-          <label>Вратари, ₽ за игру</label>
-          <input type="number" id="goalies" value="5000" min="0" step="100">
-        </div>
-        <div>
-          <label>План игроков (для расчёта в чате)</label>
-          <input type="number" id="planPlayers" value="20" min="1">
-        </div>
-        <div>
-          <label>Сумма с каждого (₽)</label>
-          <input type="number" id="chargePerPlayer" placeholder="Авто" min="0" step="100">
-          <p class="field-hint">Пусто — делим расход на число игроков. Или укажите одну сумму для всех, напр. 2200</p>
-        </div>
-      </div>
-      <div class="calc-hint">
-        <p class="calc-hint-line">
-          Стоимость льда: <strong id="hTotal">0 ₽</strong>
-          (лёд: <strong id="hIce">0 ₽</strong> · вратари: <strong id="hGoalies">0 ₽</strong>) ·
-          Игроков по плану (<span id="hPlanN">20</span>): <strong id="hPlan">0 ₽</strong>/чел ·
-        </p>
-        <p class="calc-hint-line">
-          Факт в списке (<span id="hFactN">0</span> чел): <strong id="hFact">0 ₽</strong>/чел ·
-          Будет собрано: <strong id="hTarget">0 ₽</strong> ·
-          разница составит <strong id="hDiff">0 ₽</strong>
-        </p>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Список игроков</h2>
-      <label>Вставьте список игроков (данные с порядковыми номерами или без)</label>
-      <textarea id="pasteArea" placeholder="Игрок 1&#10;Игрок 2&#10;Игрок 3"></textarea>
-      <div class="btn-row">
-        <button type="button" id="btnParse">Разобрать список</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Оплаты</h2>
-      <div class="btn-row share-row">
-        <button type="button" class="secondary" id="btnPrint">Печать / PDF</button>
-        <button type="button" class="secondary" id="btnTelegram">Скопировать в Telegram</button>
-        <span class="share-status" id="shareStatus"></span>
-      </div>
-      <p class="debtors-summary" id="debtorsSummary"><span class="count">Не оплатили (0):</span> <span id="debtorsSummaryNames">—</span></p>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>№</th>
-              <th>Игрок</th>
-              <th>Сумма</th>
-              <th>✓</th>
-              <th>Внесено</th>
-              <th>Коммент</th>
-              <th class="col-del"></th>
-            </tr>
-          </thead>
-          <tbody id="playerBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Куда сохраняются данные</h2>
-      <p class="storage-note">
-        Все игры автоматически пишутся в <strong>память браузера</strong> (localStorage) на этом компьютере.
-        При закрытии вкладки ничего не пропадает. Но если очистить историю/кэш браузера или открыть файл
-        на другом устройстве — данных там не будет. Раз в неделю сохраняйте резервную копию — файл
-        <code>.json</code> в папку «Загрузки».
-      </p>
-      <p class="storage-actions">
-        <button type="button" class="text-link" id="btnPrintCopy">Печать / PDF</button>
-        ·
-        <button type="button" class="text-link" id="btnTelegramCopy">Скопировать в Telegram</button>
-        ·
-        <button type="button" class="text-link" id="btnExport">Скачать копию</button>
-        ·
-        <button type="button" class="text-link" id="btnImport">Загрузить копию</button>
-      </p>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
+<!-- WEEK -->
+<section id="week" role="tabpanel">
+  <div class="switch">
+    <span>Турнирная игра на этой неделе</span>
+    <div class="seg" role="group" aria-label="День игры">
+      <button type="button" data-game="sat" id="g-sat">Суббота</button>
+      <button type="button" data-game="sun" id="g-sun">Воскресенье</button>
     </div>
   </div>
-
-  <script>
-    const STORAGE_KEY = 'hockey-ice-payments-v1';
-    const MAX_PLAYERS = 24;
-    const DEFAULT_PLAN_PLAYERS = 20;
-    const DEFAULT_GOALIES = 5000;
-
-    let games = [];
-    let currentId = null;
-    let playersBound = false;
-
-    function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-    }
-
-    function fmt(n) {
-      return Math.round(n).toLocaleString('ru-RU') + ' ₽';
-    }
-
-    function fmtSigned(n) {
-      const v = Math.round(n);
-      const abs = Math.abs(v).toLocaleString('ru-RU') + ' ₽';
-      if (v > 0) return '+' + abs;
-      if (v < 0) return '−' + abs;
-      return '0 ₽';
-    }
-
-    const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-
-    function formatGameDate(isoDate) {
-      if (!isoDate) return '?';
-      const d = new Date(isoDate + 'T12:00:00');
-      if (Number.isNaN(d.getTime())) return isoDate;
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yy = String(d.getFullYear()).slice(-2);
-      return dd + '.' + mm + '.' + yy + ' (' + WEEKDAYS[d.getDay()] + ')';
-    }
-
-    function updateDateFormatted() {
-      const el = document.getElementById('gameDateFormatted');
-      const raw = document.getElementById('gameDate').value;
-      el.textContent = raw ? formatGameDate(raw) : '';
-    }
-
-    function showSaved() {
-      const el = document.getElementById('saveStatus');
-      const now = new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      el.textContent = 'Сохранено автоматически в браузере · ' + now;
-    }
-
-    function load() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) games = JSON.parse(raw);
-      } catch (_) { games = []; }
-      if (!games.length) games.push(newGameData());
-      let migrated = false;
-      games.forEach(g => {
-        if (g.planPlayers === 16) { g.planPlayers = DEFAULT_PLAN_PLAYERS; migrated = true; }
-        ensurePlayerRows(g);
-      });
-      if (migrated) save();
-      currentId = games[0].id;
-      renderGameSelect();
-      applyGame(games[0]);
-      bindPlayerTable();
-      showSaved();
-    }
-
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-      showSaved();
-    }
-
-    function newGameData() {
-      const d = new Date();
-      return {
-        id: uid(),
-        venue: 'СК Молодежка',
-        date: d.toISOString().slice(0, 10),
-        iceHour: 25000,
-        duration: 1.25,
-        goalies: DEFAULT_GOALIES,
-        planPlayers: DEFAULT_PLAN_PLAYERS,
-        chargePerPlayer: '',
-        players: []
-      };
-    }
-
-    function currentGame() {
-      return games.find(g => g.id === currentId);
-    }
-
-    function renderGameSelect() {
-      const sel = document.getElementById('gameSelect');
-      sel.innerHTML = games.map(g => {
-        const label = formatGameDate(g.date) + ' — ' + (g.venue || 'Игра');
-        return `<option value="${g.id}">${label}</option>`;
-      }).join('');
-      sel.value = currentId;
-    }
-
-    function getChargePerPlayer(g) {
-      const v = g.chargePerPlayer;
-      if (v === '' || v == null) return null;
-      const n = Number(v);
-      return !Number.isNaN(n) && n > 0 ? n : null;
-    }
-
-    function paymentNum(p) {
-      const amt = p.amount;
-      if (amt === '' || amt == null) return null;
-      const num = Number(String(amt).replace(/\s/g, ''));
-      return Number.isNaN(num) ? null : num;
-    }
-
-    function sharePerPlayer(total, count) {
-      if (count <= 0) return 0;
-      return Math.ceil(total / count);
-    }
-
-    function dueForIndex(g, i) {
-      return calcTotals(g).dues[i];
-    }
-
-    function calcTotals(g) {
-      const iceCost = (g.iceHour || 0) * (g.duration || 0);
-      const goalieCost = g.goalies || 0;
-      const expense = iceCost + goalieCost;
-      const players = filledPlayers(g);
-      const n = players.length;
-      const fixed = getChargePerPlayer(g);
-      const autoFact = n > 0 ? sharePerPlayer(expense, n) : 0;
-      const baseFact = fixed != null ? fixed : autoFact;
-      const plan = g.planPlayers > 0 ? sharePerPlayer(expense, g.planPlayers) : 0;
-      const collectionTarget = baseFact * n;
-
-      let collected = 0;
-      const dues = {};
-
-      g.players.forEach((p, i) => {
-        if (!(p.name || '').trim()) {
-          dues[i] = '';
-          return;
-        }
-
-        if (p.dueOverride != null) {
-          dues[i] = p.dueOverride;
-          if (p.paid) {
-            const num = paymentNum(p);
-            collected += num != null ? num : p.dueOverride;
-          }
-          return;
-        }
-
-        dues[i] = baseFact;
-        if (p.paid) {
-          const num = paymentNum(p);
-          collected += num != null ? num : baseFact;
-        }
-      });
-
-      let debtors = 0;
-      players.forEach(p => { if (!p.paid) debtors++; });
-
-      return {
-        iceCost, goalieCost, expense, plan, fact: baseFact, autoFact, fixed,
-        perUnpaid: baseFact, dues,
-        n, collected, left: collectionTarget - collected,
-        surplus: collected > expense ? collected - expense : 0,
-        targetCollection: collectionTarget,
-        debtors, players
-      };
-    }
-
-    function syncParamsFromDom() {
-      const g = currentGame();
-      if (!g) return g;
-      g.venue = document.getElementById('venue').value;
-      g.date = document.getElementById('gameDate').value;
-      g.iceHour = Number(document.getElementById('iceHour').value) || 0;
-      g.duration = Number(document.getElementById('duration').value) || 0;
-      g.goalies = Number(document.getElementById('goalies').value) || 0;
-      g.planPlayers = Number(document.getElementById('planPlayers').value) || DEFAULT_PLAN_PLAYERS;
-      const chargeRaw = document.getElementById('chargePerPlayer').value.trim();
-      g.chargePerPlayer = chargeRaw === '' ? '' : Number(chargeRaw);
-      return g;
-    }
-
-    function syncPlayersFromDom() {
-      const g = currentGame();
-      if (!g) return;
-      document.querySelectorAll('#playerBody tr').forEach(tr => {
-        const i = +tr.dataset.i;
-        const p = g.players[i];
-        p.name = tr.querySelector('[data-f=name]').value;
-        p.paid = tr.querySelector('[data-f=paid]').checked;
-        const amt = tr.querySelector('[data-f=amount]').value.trim();
-        p.amount = amt === '' ? '' : Number(amt);
-        p.comment = tr.querySelector('[data-f=comment]').value;
-      });
-    }
-
-    function filledPlayers(g) {
-      return (g.players || []).filter(p => (p.name || '').trim());
-    }
-
-    function updateDebtorsUI(t) {
-      const names = t.players.filter(p => !p.paid).map(p => p.name.trim());
-      const count = names.length;
-      const namesStr = count ? names.join(', ') : 'все оплатили';
-
-      document.getElementById('debtorsTitle').textContent = 'Не оплатили (' + count + '):';
-      document.getElementById('debtorsNames').textContent = namesStr;
-
-      const dl = document.getElementById('debtorsList');
-      dl.classList.toggle('all-paid', count === 0 && t.n > 0);
-
-      const summary = document.getElementById('debtorsSummary');
-      summary.classList.toggle('all-paid', count === 0 && t.n > 0);
-      summary.querySelector('.count').textContent = 'Не оплатили (' + count + '):';
-      document.getElementById('debtorsSummaryNames').textContent = namesStr;
-    }
-
-    function updateDashboard() {
-      const g = currentGame();
-      if (!g) return;
-      const t = calcTotals(g);
-      document.getElementById('dNeed').textContent = fmt(t.expense);
-      document.getElementById('dNeedBreak').textContent =
-        'лёд: ' + fmt(t.iceCost) + ' · вратари: ' + fmt(t.goalieCost);
-      document.getElementById('dCollected').textContent = fmt(t.collected);
-
-      const leftEl = document.getElementById('dLeft');
-      const leftBox = leftEl.closest('.dash-item');
-      leftBox.classList.remove('deficit', 'surplus', 'exact');
-      if (t.left > 0) {
-        leftEl.textContent = '−' + fmt(t.left);
-        leftBox.classList.add('deficit');
-      } else if (t.left < 0) {
-        leftEl.textContent = '+' + fmt(t.surplus);
-        leftBox.classList.add('surplus');
-      } else {
-        leftEl.textContent = '0 ₽';
-        leftBox.classList.add('exact');
-      }
-
-      const debtorsEl = document.getElementById('dDebtors');
-      debtorsEl.textContent = t.debtors;
-      debtorsEl.closest('.dash-item').classList.toggle('all-paid', t.debtors === 0);
-      document.getElementById('hTotal').textContent = fmt(t.expense);
-      document.getElementById('hIce').textContent = fmt(t.iceCost);
-      document.getElementById('hGoalies').textContent = fmt(t.goalieCost);
-      document.getElementById('hPlanN').textContent = g.planPlayers;
-      document.getElementById('hPlan').textContent = fmt(t.plan);
-      document.getElementById('hFact').textContent = fmt(t.perUnpaid);
-      document.getElementById('hFactN').textContent = t.n;
-      document.getElementById('hTarget').textContent = fmt(t.targetCollection);
-      const diff = t.targetCollection - t.expense;
-      const diffEl = document.getElementById('hDiff');
-      diffEl.textContent = fmtSigned(diff);
-      diffEl.className = diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : '';
-      updateDebtorsUI(t);
-    }
-
-    function parseTelegramList(text) {
-      const lines = text.split(/\r?\n/);
-      const players = [];
-      const skip = /^(цена|сумма|стоимость|лед|вратар|четверг|ск\s|с\sк|🏒|🥅|—|-{2,}|\d{1,2}:\d{2})/i;
-      const goalie = /вратар|🥅|голкипер/i;
-
-      for (const raw of lines) {
-        let line = raw.trim();
-        if (!line || skip.test(line) || goalie.test(line)) continue;
-        line = line.replace(/^[\d]+[\.\)\-]\s*/, '');
-        line = line.replace(/^[-•*]\s*/, '');
-        if (/^\d+$/.test(line)) continue;
-        if (line.length < 2) continue;
-        players.push({ name: line, paid: false, amount: '', comment: '', dueOverride: null, owedWhenPaid: null });
-      }
-      return players;
-    }
-
-    function emptyPlayer() {
-      return { name: '', paid: false, amount: '', comment: '', dueOverride: null, owedWhenPaid: null };
-    }
-
-    function ensurePlayerRows(g) {
-      if (!g.players) g.players = [];
-      const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
-      const filled = filledPlayers(g);
-
-      if (filled.length === 0) {
-        while (g.players.length < plan) g.players.push(emptyPlayer());
-        if (g.players.length > plan) g.players.length = plan;
-        return;
-      }
-
-      const lastFilledIdx = g.players.reduce((max, p, i) =>
-        (p.name || '').trim() ? i : max, -1);
-      const minLen = Math.max(plan, lastFilledIdx + 2);
-      while (g.players.length < minLen) g.players.push(emptyPlayer());
-    }
-
-    function rowClass(p, isLastEmpty) {
-      const name = (p.name || '').trim();
-      if (!name) return isLastEmpty ? 'add-row' : 'empty';
-      return p.paid ? 'paid' : 'unpaid';
-    }
-
-    function updateDueCells() {
-      const g = currentGame();
-      if (!g) return;
-      const t = calcTotals(g);
-      document.querySelectorAll('#playerBody tr').forEach(tr => {
-        const i = +tr.dataset.i;
-        const due = t.dues[i];
-        const p = g.players[i];
-        const cell = tr.querySelector('.due-cell');
-        if (cell) cell.textContent = due !== '' && due != null ? fmt(due) : '—';
-        const amtInp = tr.querySelector('[data-f=amount]');
-        if (!amtInp || !p) return;
-        if (!p.paid) {
-          amtInp.placeholder = due !== '' && due != null ? String(due) : '';
-        } else {
-          amtInp.placeholder = '';
-        }
-      });
-    }
-
-    function updateRowNumbers(g) {
-      let num = 0;
-      document.querySelectorAll('#playerBody tr').forEach(tr => {
-        const i = +tr.dataset.i;
-        const p = g.players[i];
-        if (!p || !tr.cells[0]) return;
-        const hasName = !!(p.name || '').trim();
-        tr.cells[0].textContent = hasName ? ++num : '';
-      });
-    }
-
-    function updateRowClass(tr, p, g) {
-      const i = +tr.dataset.i;
-      const isLastEmpty = i === g.players.length - 1 && !(p.name || '').trim();
-      tr.className = rowClass(p, isLastEmpty);
-      const hasName = !!(p.name || '').trim();
-      tr.querySelector('[data-f=paid]').disabled = !hasName;
-      tr.querySelector('[data-f=amount]').disabled = !hasName;
-      tr.querySelector('[data-f=comment]').disabled = !hasName;
-      const delTd = tr.querySelector('.col-del');
-      if (delTd) {
-        if (hasName && !delTd.querySelector('.btn-del')) {
-          delTd.innerHTML = '<button type="button" class="btn-del" title="Удалить игрока">удалить</button>';
-        } else if (!hasName) {
-          delTd.innerHTML = '';
-        }
-      }
-      const delBtn = tr.querySelector('.btn-del');
-      if (delBtn) delBtn.style.visibility = hasName ? 'visible' : 'hidden';
-    }
-
-    function trimTrailingEmpty(g) {
-      const filled = filledPlayers(g);
-      const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
-
-      if (filled.length === 0) return;
-
-      const lastFilledIdx = g.players.reduce((max, p, i) =>
-        (p.name || '').trim() ? i : max, -1);
-      const minLen = Math.max(plan, lastFilledIdx + 2);
-
-      while (g.players.length > minLen) {
-        const last = g.players[g.players.length - 1];
-        if ((last.name || '').trim()) break;
-        g.players.pop();
-      }
-
-      const last = g.players[g.players.length - 1];
-      if (last && (last.name || '').trim() && filled.length < MAX_PLAYERS) {
-        g.players.push(emptyPlayer());
-      }
-    }
-
-    function renderPlayers(g) {
-      ensurePlayerRows(g);
-      trimTrailingEmpty(g);
-      const t = calcTotals(g);
-      const tbody = document.getElementById('playerBody');
-      const lastIdx = g.players.length - 1;
-      let num = 0;
-      tbody.innerHTML = g.players.map((p, i) => {
-        const hasName = (p.name || '').trim();
-        const displayNum = hasName ? ++num : '';
-        const due = t.dues[i] ?? '';
-        const isLastEmpty = i === lastIdx && !hasName;
-        const cls = rowClass(p, isLastEmpty);
-        const amtVal = p.amount !== '' && p.amount != null ? p.amount : '';
-        const ph = !hasName ? 'Имя игрока' : '';
-        return `<tr class="${cls}" data-i="${i}">
-          <td>${displayNum}</td>
-          <td class="name"><input type="text" class="cmt name-inp" data-f="name" value="${esc((p.name || '').trim() ? p.name : '')}" placeholder="${ph}"></td>
-          <td class="due-cell">${due !== '' ? fmt(due) : '—'}</td>
-          <td><input type="checkbox" class="chk" data-f="paid" ${p.paid ? 'checked' : ''} ${!(p.name || '').trim() ? 'disabled' : ''}></td>
-          <td><input type="text" inputmode="numeric" class="amt" data-f="amount" value="${amtVal !== '' ? esc(String(amtVal)) : ''}" placeholder="${due || ''}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
-          <td><input type="text" class="cmt" data-f="comment" value="${esc(p.comment)}" ${!(p.name || '').trim() ? 'disabled' : ''}></td>
-          <td class="col-del">${hasName ? '<button type="button" class="btn-del" title="Удалить игрока">удалить</button>' : ''}</td>
-        </tr>`;
-      }).join('');
-    }
-
-    function esc(s) {
-      return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    }
-
-    function bindPlayerTable() {
-      if (playersBound) return;
-      playersBound = true;
-      const tbody = document.getElementById('playerBody');
-
-      tbody.addEventListener('input', (e) => {
-        const inp = e.target;
-        if (!inp.dataset.f) return;
-        const tr = inp.closest('tr');
-        const g = currentGame();
-        const p = g.players[+tr.dataset.i];
-        const i = +tr.dataset.i;
-        const field = inp.dataset.f;
-
-        if (field === 'name') {
-          const prevTrimmed = (p.name || '').trim();
-          p.name = inp.value;
-          const plan = Math.min(MAX_PLAYERS, g.planPlayers > 0 ? g.planPlayers : DEFAULT_PLAN_PLAYERS);
-          const filledCount = filledPlayers(g).length;
-          if (!prevTrimmed && inp.value.trim() && i === g.players.length - 1
-              && filledCount >= plan && filledCount < MAX_PLAYERS) {
-            const caret = inp.selectionStart;
-            const editIdx = i;
-            g.players.push(emptyPlayer());
-            save();
-            renderPlayers(g);
-            const focusTr = tbody.querySelector(`tr[data-i="${editIdx}"]`);
-            const focusInp = focusTr?.querySelector('[data-f=name]');
-            if (focusInp) {
-              focusInp.focus();
-              const pos = Math.min(caret, focusInp.value.length);
-              focusInp.setSelectionRange(pos, pos);
-            }
-            updateDashboard();
-            return;
-          }
-          updateRowClass(tr, p, g);
-          updateRowNumbers(g);
-          updateDueCells();
-        } else if (field === 'amount') {
-          p.amount = inp.value.trim();
-        } else if (field === 'comment') {
-          p.comment = inp.value;
-        }
-        save();
-        if (field !== 'name') updateDueCells();
-        updateDashboard();
-      });
-
-      tbody.addEventListener('change', (e) => {
-        const inp = e.target;
-        if (inp.dataset.f !== 'paid') return;
-        const tr = inp.closest('tr');
-        const g = currentGame();
-        const i = +tr.dataset.i;
-        const p = g.players[i];
-        const amtInp = tr.querySelector('[data-f=amount]');
-
-        if (inp.checked) {
-          if (paymentNum(p) == null) {
-            const due = dueForIndex(g, i);
-            const fill = due !== '' && due != null ? due : calcTotals(g).fact;
-            p.owedWhenPaid = fill;
-            p.amount = fill;
-            if (amtInp) amtInp.value = fill;
-          } else {
-            p.owedWhenPaid = paymentNum(p);
-          }
-          p.paid = true;
-        } else {
-          p.paid = false;
-          p.amount = '';
-          p.owedWhenPaid = null;
-          if (amtInp) amtInp.value = '';
-        }
-
-        updateRowClass(tr, p, g);
-        save();
-        updateDueCells();
-        updateDashboard();
-      });
-
-      tbody.addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-del');
-        if (!btn) return;
-        const tr = btn.closest('tr');
-        const g = currentGame();
-        const i = +tr.dataset.i;
-        g.players.splice(i, 1);
-        ensurePlayerRows(g);
-        save();
-        renderPlayers(g);
-        updateDashboard();
-      });
-    }
-
-    function persistCurrentGame() {
-      syncParamsFromDom();
-      syncPlayersFromDom();
-      save();
-      renderGameSelect();
-    }
-
-    function applyGame(g) {
-      document.getElementById('venue').value = g.venue || '';
-      document.getElementById('gameDate').value = g.date || '';
-      document.getElementById('iceHour').value = g.iceHour ?? 25000;
-      document.getElementById('duration').value = String(g.duration ?? 1.25);
-      document.getElementById('goalies').value = g.goalies ?? DEFAULT_GOALIES;
-      document.getElementById('planPlayers').value = g.planPlayers ?? DEFAULT_PLAN_PLAYERS;
-      const charge = g.chargePerPlayer;
-      document.getElementById('chargePerPlayer').value =
-        charge !== '' && charge != null && !Number.isNaN(Number(charge)) ? charge : '';
-      renderPlayers(g);
-      updateDashboard();
-      updateDateFormatted();
-    }
-
-    function onParamsChange(e) {
-      syncParamsFromDom();
-      const g = currentGame();
-      save();
-      if (e && e.target && e.target.id === 'planPlayers') {
-        ensurePlayerRows(g);
-        renderPlayers(g);
-      }
-      updateDueCells();
-      updateDashboard();
-      updateDateFormatted();
-      renderGameSelect();
-    }
-
-    function bindParams() {
-      ['venue', 'gameDate', 'iceHour', 'duration', 'goalies', 'planPlayers', 'chargePerPlayer'].forEach(id => {
-        const el = document.getElementById(id);
-        el.addEventListener('input', onParamsChange);
-        el.addEventListener('change', onParamsChange);
-      });
-    }
-
-    function durationLabel(v) {
-      const n = Number(v);
-      if (n === 1) return '1 час';
-      if (n === 1.25) return '1 час 15 минут';
-      if (n === 1.5) return '1 час 30 минут';
-      return String(v);
-    }
-
-    function leftoverLabel(t) {
-      if (t.left > 0) return '−' + fmt(t.left);
-      if (t.left < 0) return '+' + fmt(t.surplus);
-      return '0 ₽';
-    }
-
-    function reportPlayers(g, t) {
-      return filledPlayers(g).map((p, i) => {
-        const idx = g.players.indexOf(p);
-        const due = t.dues[idx];
-        const paidAmt = paymentNum(p);
-        return {
-          num: i + 1,
-          name: (p.name || '').trim(),
-          due: due !== '' && due != null ? due : t.fact,
-          paid: !!p.paid,
-          amount: paidAmt,
-          comment: (p.comment || '').trim()
-        };
-      });
-    }
-
-    function formatTelegramText(g) {
-      persistCurrentGame();
-      g = currentGame();
-      const t = calcTotals(g);
-      const rows = reportPlayers(g, t);
-      const unpaid = rows.filter(r => !r.paid).map(r => r.name);
-      const lines = [];
-      lines.push(formatGameDate(g.date) + ' — ' + (g.venue || 'Игра'));
-      lines.push('Лёд: ' + fmt(t.iceCost) + ' · Вратари: ' + fmt(t.goalieCost) + ' · ' + durationLabel(g.duration));
-      lines.push('Нужно: ' + fmt(t.expense));
-      lines.push('Собрано: ' + fmt(t.collected));
-      lines.push('Осталось: ' + leftoverLabel(t));
-      lines.push('Будет собрано: ' + fmt(t.targetCollection));
-      lines.push('');
-      if (unpaid.length) {
-        lines.push('Не оплатили (' + unpaid.length + '): ' + unpaid.join(', '));
-      } else {
-        lines.push('Не оплатили (0): все оплатили');
-      }
-      lines.push('');
-      rows.forEach(r => {
-        let line = r.num + '. ' + r.name + ' — ' + fmt(r.due);
-        if (r.paid) {
-          line += ' ✓';
-          if (r.amount != null) line += ' ' + r.amount;
-        }
-        if (r.comment) line += ' (' + r.comment + ')';
-        lines.push(line);
-      });
-      return lines.join('\n');
-    }
-
-    function showShareStatus(msg) {
-      const el = document.getElementById('shareStatus');
-      el.textContent = msg;
-      clearTimeout(showShareStatus._t);
-      showShareStatus._t = setTimeout(() => { el.textContent = ''; }, 2500);
-    }
-
-    function copyTelegram() {
-      const text = formatTelegramText(currentGame());
-      const done = () => showShareStatus('Скопировано');
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done).catch(() => copyTelegramFallback(text, done));
-      } else {
-        copyTelegramFallback(text, done);
-      }
-    }
-
-    function copyTelegramFallback(text, done) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); done(); }
-      catch (_) { alert(text); }
-      document.body.removeChild(ta);
-    }
-
-    function printGameReport() {
-      persistCurrentGame();
-      const g = currentGame();
-      const t = calcTotals(g);
-      const rows = reportPlayers(g, t);
-      const unpaid = rows.filter(r => !r.paid).map(r => r.name);
-      const unpaidLine = unpaid.length
-        ? 'Не оплатили (' + unpaid.length + '): ' + unpaid.join(', ')
-        : 'Не оплатили (0): все оплатили';
-      const tableRows = rows.map(r => {
-        return '<tr>' +
-          '<td>' + r.num + '</td>' +
-          '<td>' + esc(r.name) + '</td>' +
-          '<td>' + fmt(r.due) + '</td>' +
-          '<td>' + (r.paid ? 'да' : '') + '</td>' +
-          '<td>' + (r.amount != null ? esc(String(r.amount)) : '') + '</td>' +
-          '<td>' + esc(r.comment) + '</td>' +
-          '</tr>';
-      }).join('');
-
-      const html = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>Оплаты — ${esc(formatGameDate(g.date))}</title>
-  <style>
-    body { font-family: "Segoe UI", system-ui, sans-serif; color: #111; margin: 24px; }
-    h1 { font-size: 20px; margin: 0 0 4px; }
-    .sub { color: #555; margin-bottom: 16px; }
-    .dash { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-    .dash div { border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; min-width: 120px; }
-    .dash .lbl { font-size: 11px; text-transform: uppercase; color: #666; }
-    .dash .val { font-size: 18px; font-weight: 700; margin-top: 2px; }
-    .unpaid { margin-bottom: 14px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-    th { font-size: 11px; text-transform: uppercase; color: #555; }
-    .hint { margin-top: 18px; font-size: 12px; color: #777; }
-    @media print { body { margin: 12mm; } .hint { display: none; } }
-  </style>
-</head>
-<body>
-  <h1>Учёт оплат за лёд</h1>
-  <p class="sub">${esc(formatGameDate(g.date))} — ${esc(g.venue || 'Игра')} · ${esc(durationLabel(g.duration))}</p>
-  <div class="dash">
-    <div><div class="lbl">Нужно</div><div class="val">${fmt(t.expense)}</div></div>
-    <div><div class="lbl">Собрано</div><div class="val">${fmt(t.collected)}</div></div>
-    <div><div class="lbl">Осталось</div><div class="val">${leftoverLabel(t)}</div></div>
-    <div><div class="lbl">Не оплатили</div><div class="val">${t.debtors}</div></div>
+  <div class="week">
+    <div class="day"><div class="dname">Пн</div><div class="dwhat">Вечер: мобильность и кор, 15–20 мин<small>Пах, поясница, тазобедренные</small><button class="go" data-jump="mob">Открыть</button></div></div>
+    <div class="day game"><div class="dname">Вт</div><div class="dwhat">Игра<small>Перед игрой 10 мин динамической разминки</small></div></div>
+    <div class="day train"><div class="dname">Ср</div><div class="dwhat">8:10 · Тренировка А, сила<small>Главная силовая недели, 48 ч до игры</small><button class="go" data-jump="a">Открыть</button></div></div>
+    <div class="day game"><div class="dname">Чт</div><div class="dwhat">Тренировка и игра</div></div>
+    <div class="day train"><div class="dname">Пт</div><div class="dwhat">
+      <span data-when="sun">8:10 · Тренировка Б, полная</span><span data-when="sat">8:10 · Тренировка Б, облегчённая (25 мин)</span>
+      <small data-when="sun">Спринты, прыжки, взрывной верх</small><small data-when="sat">Завтра игра: проснуться, а не устать</small>
+      <button class="go" data-jump="b">Открыть</button></div></div>
+    <div class="day" data-when="sun"><div class="dname" style="color:var(--blue)">Сб</div><div class="dwhat">Утро · Тренировка В, полная<small>Интервалы 400/800 и круговая</small><button class="go" data-jump="c">Открыть</button></div></div>
+    <div class="day game" data-when="sun"><div class="dname">Вс</div><div class="dwhat">Вечер · турнирная игра</div></div>
+    <div class="day game" data-when="sat"><div class="dname">Сб</div><div class="dwhat">Вечер · турнирная игра</div></div>
+    <div class="day" data-when="sat"><div class="dname" style="color:var(--blue)">Вс</div><div class="dwhat">Утро · Тренировка В, лёгкая<small>Ровный бег и верх тела, без интервалов</small><button class="go" data-jump="c">Открыть</button></div></div>
   </div>
-  <p class="unpaid">${esc(unpaidLine)}</p>
-  <table>
-    <thead>
-      <tr><th>№</th><th>Игрок</th><th>Сумма</th><th>Оплатил</th><th>Внесено</th><th>Коммент</th></tr>
-    </thead>
-    <tbody>${tableRows}</tbody>
-  </table>
-  <p class="hint">В окне печати выберите «Сохранить как PDF», если нужен файл.</p>
-</body>
-</html>`;
+  <div class="block">
+    <h3>Каждая тренировка, ~40 мин</h3>
+    <ul class="plain">
+      <li><b>8–10 мин движение:</b> трусца 400 м, затем упражнения из блока ниже.</li>
+      <li><b>8–12 мин беговой блок</b> по плану дня.</li>
+      <li><b>18–20 мин работа с весом.</b></li>
+      <li><b>2–3 мин заминка:</b> шаг и пара растяжек.</li>
+    </ul>
+  </div>
+  <div class="block" id="warm">
+    <h3>Разминка-движение, 8–10 мин</h3>
+    <p class="note">Сначала трусца 400 м, затем каждое упражнение.</p>
+    <ul class="ex"><li><label><input type="checkbox" id="w-1"><span><span class="n">Скрестный бег (карьока)</span><span class="d">2×20 м</span></span></label><div class="how">Двигайтесь боком, ноги поочерёдно перекрещиваются спереди и сзади. Таз вращается, плечи смотрят вперёд. <span class="links"><a href="https://www.youtube.com/results?search_query=carioca+drill" target="_blank" rel="noopener">Видео ↗</a></span></div></li><li><label><input type="checkbox" id="w-2"><span><span class="n">Приставной шаг</span><span class="d">2×20 м</span></span></label><div class="how">Низкая стойка, как в защите на льду. Шагайте вбок, стопы не сводите. <span class="links"><a href="https://www.youtube.com/results?search_query=lateral+shuffle+drill" target="_blank" rel="noopener">Видео ↗</a></span></div></li><li><label><input type="checkbox" id="w-3"><span><span class="n">Бег спиной</span><span class="d">2×20 м</span></span></label><div class="how">Корпус чуть наклонён вперёд, шаги короткие и быстрые на передней части стопы. <span class="links"><a href="https://www.youtube.com/results?search_query=backpedal+running+drill" target="_blank" rel="noopener">Видео ↗</a></span></div></li><li><label><input type="checkbox" id="w-4"><span><span class="n">Поворот 180° со стартом</span><span class="d">2×20 м</span></span></label><div class="how">5 м бегите спиной, развернитесь бёдрами и ускорьтесь вперёд на 10 м. Как переход из обороны в атаку. <span class="links"><a href="https://www.youtube.com/results?search_query=backpedal+turn+and+sprint+drill" target="_blank" rel="noopener">Видео ↗</a></span></div></li><li><label><input type="checkbox" id="w-5"><span><span class="n">Прыжки конькобежца, лёгкие</span><span class="d">2×20 м</span></span></label><div class="how">Лёгкие прыжки вбок с ноги на ногу, мягкое приземление. <span class="links"><a href="https://www.youtube.com/results?search_query=skater+jumps" target="_blank" rel="noopener">Видео ↗</a></span></div></li><li><label><input type="checkbox" id="w-6"><span><span class="n">Высокое колено</span><span class="d">2×20 м</span></span></label><div class="how">Быстро поднимайте колени до пояса, приземляйтесь на переднюю часть стопы. <span class="links"><a href="https://darebee.com/exercises/high-knees.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li></ul>
+    <div class="rowbtn"><button class="reset" data-reset="warm">Сбросить отметки</button></div>
+  </div>
+  <div class="block">
+    <h3>Цикл на 4 недели</h3>
+    <p>Недели 1–3: +1–2 повтора, +1 подтягивание, интервалы чуть быстрее. Неделя 4: разгрузка, объём на треть меньше.</p>
+    <p class="note">Гиря 16 кг скоро станет мала для ног. Хорошая покупка: 24 кг.</p>
+  </div>
+</section>
 
-      const w = window.open('', '_blank');
-      if (!w) {
-        alert('Разрешите всплывающие окна, чтобы открыть печать.');
-        return;
-      }
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      setTimeout(() => {
-        w.print();
-      }, 250);
-    }
+<!-- A -->
+<section id="a" role="tabpanel" hidden>
+  <h2>А · Сила</h2>
+  <div class="meta"><span class="chip">Среда 8:10</span><span class="chip">Суперсеты × 3 круга</span><span class="chip">Отдых 60–90 с</span></div>
+  <div class="block">
+    <h3>Беговой блок</h3>
+    <ul class="ex" data-group="a-run">
+      <li><label><input type="checkbox" id="a-r1"><span><span class="n">5 ускорений по 20–30 м</span><span class="d">85–90%, обратно шагом. Вы после игры, на максимум не нужно</span></span></label><div class="how">Стартуйте из стойки. Первые 5 шагов короткие и мощные, корпус наклонён вперёд, руки работают активно. <span class="links"><a href="https://www.youtube.com/results?search_query=acceleration+sprint+technique" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+    </ul>
+  </div>
+  <div class="block">
+    <h3>Силовой блок</h3>
+    <ul class="ex">
+      <li><label><input type="checkbox" id="a-1"><span><span class="n"><span class="tag">A1</span>Болгарский выпад с гирей 16 кг</span><span class="d">6–8 на ногу, задняя нога на скамейке</span></span></label><div class="how">Держите гирю у груди. Передняя стопа стоит далеко от скамейки. Опускайтесь вниз, колено идёт по направлению носка, корпус слегка наклонён. Вставайте толчком пятки. <span class="links"><a href="https://www.youtube.com/results?search_query=bulgarian+split+squat+goblet+kettlebell" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="a-2"><span><span class="n"><span class="tag">A2</span>Подтягивания</span><span class="d">5–8 раз</span></span></label><div class="how">Хват чуть шире плеч, начинайте из полного виса. Сначала опустите лопатки, затем тяните грудь к перекладине. Не раскачивайтесь. <span class="links"><a href="https://darebee.com/pullups-guide.html" target="_blank" rel="noopener">Darebee ↗</a> <a href="https://www.youtube.com/results?search_query=pull+up+technique" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="a-3"><span><span class="n"><span class="tag">B1</span>Румынская тяга на одной ноге с гирей</span><span class="d">8 на ногу, баланс и задняя поверхность бедра</span></span></label><div class="how">Гиря в руке, противоположной опорной ноге. Опорное колено слегка согнуто. Таз уходит назад, спина ровная, свободная нога тянется назад на одной линии с корпусом. <span class="links"><a href="https://www.youtube.com/results?search_query=single+leg+romanian+deadlift+kettlebell" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="a-4"><span><span class="n"><span class="tag">B2</span>Брусья</span><span class="d">6–10 раз (или отжимания)</span></span></label><div class="how">Опустите плечи, корпус слегка наклоните вперёд. Опускайтесь до угла 90° в локтях, не глубже: так плечи останутся целы. <span class="links"><a href="https://www.youtube.com/results?search_query=parallel+bar+dips+technique" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="a-5"><span><span class="n"><span class="tag">C1</span>Копенгагенская планка</span><span class="d">20 с на сторону, колено верхней ноги на скамейке. Профилактика паха</span></span></label><div class="how">Лягте на бок, верхнее колено положите на скамейку. Поднимите таз, чтобы тело стало одной линией. Если тянет пах, начинайте с 10 с. <span class="links"><a href="https://www.youtube.com/results?search_query=copenhagen+plank+short+lever" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="a-6"><span><span class="n"><span class="tag">C2</span>Фермерская прогулка с гирей в одной руке</span><span class="d">30 м на каждую руку. Поясница без нагрузки на позвоночник</span></span></label><div class="how">Гиря в одной руке. Идите прямо и не заваливайтесь в её сторону. Плечи держите на одном уровне, пресс напряжён. <span class="links"><a href="https://www.youtube.com/results?search_query=suitcase+carry+kettlebell" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+    </ul>
+    <div class="rowbtn"><button class="reset" data-reset="a">Сбросить отметки</button></div>
+  </div>
+</section>
 
-    function exportBackup() {
-      persistCurrentGame();
-      const blob = new Blob([JSON.stringify(games, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      const date = new Date().toISOString().slice(0, 10);
-      a.href = URL.createObjectURL(blob);
-      a.download = 'hockey-payments-' + date + '.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
+<!-- B -->
+<section id="b" role="tabpanel" hidden>
+  <h2>Б · Скорость</h2>
+  <div class="switch">
+    <span>Версия</span>
+    <div class="seg" role="group" aria-label="Версия тренировки Б">
+      <button type="button" data-game="sun" id="b-sun">Полная</button>
+      <button type="button" data-game="sat" id="b-sat">Облегчённая</button>
+    </div>
+  </div>
+  <p class="note" data-when="sun">Игра в воскресенье. Отдыхайте полностью: скорость тренируется только на свежих мышцах.</p>
+  <p class="note" data-when="sat">Завтра игра. 25 минут: задача проснуться, а не устать.</p>
+  <div class="block" data-when="sun">
+    <ul class="ex">
+      <li><label><input type="checkbox" id="b-1"><span><span class="n">6 спринтов по 20 м с разных стартов</span><span class="d">Лицом, боком, спиной с разворотом, из выпада</span></span></label><div class="how">Каждый спринт начинайте из нового положения. Боком: разворот и рывок. Спиной: разворот на 180°. Обратно возвращайтесь шагом. <span class="links"><a href="https://www.youtube.com/results?search_query=multi+directional+sprint+start+drill" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="b-2"><span><span class="n">Прыжки конькобежца 3×5 на сторону</span><span class="d">Фиксация приземления 2 с</span></span></label><div class="how">Прыгайте вбок с одной ноги на другую, как при толчке коньком. Приземляйтесь мягко на согнутую ногу, колено над стопой. Свободная нога остаётся за спиной. <span class="links"><a href="https://www.youtube.com/results?search_query=skater+jumps+stick+landing" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="b-3"><span><span class="n">Махи гирей 4×10</span><span class="d">Каждый мах взрывной</span></span></label><div class="how">Гиря движется за счёт таза, а не рук и не приседа. Отведите таз назад, гиря уходит между ног. Резко выпрямите таз, и гиря взлетит до груди. <span class="links"><a href="https://www.youtube.com/results?search_query=kettlebell+swing+technique+hardstyle" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="b-4"><span><span class="n">Взрывные отжимания 3×6</span><span class="d">Руки отрываются от земли</span></span></label><div class="how">Опуститесь в упоре лёжа и мощно оттолкнитесь, чтобы ладони оторвались от земли. Приземляйтесь на мягкие локти. Для начала можно упирать руки в скамейку. <span class="links"><a href="https://darebee.com/pushups-guide.html" target="_blank" rel="noopener">Darebee ↗</a> <a href="https://www.youtube.com/results?search_query=plyometric+push+up" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="b-5"><span><span class="n">«Боксёрка» с гантелями 1,5 кг 3×15 с</span><span class="d">На скорость рук</span></span></label><div class="how">Встаньте в боксёрскую стойку с гантелями в руках. Наносите быстрые прямые удары по очереди, локоть до конца не выпрямляйте. <span class="links"><a href="https://darebee.com/exercises/punches.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="b-6"><span><span class="n">Подъёмы ног в висе 3×10</span></span></label><div class="how">Повисните на перекладине, лопатки напряжены. Поднимайте ноги до уровня таза без раскачки, опускайте медленно. Для облегчения сгибайте колени. <span class="links"><a href="https://www.youtube.com/results?search_query=hanging+leg+raise+technique" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+    </ul>
+    <div class="rowbtn"><button class="reset" data-reset="b">Сбросить отметки</button></div>
+  </div>
+  <div class="block" data-when="sat">
+    <ul class="ex">
+      <li><label><input type="checkbox" id="bl-1"><span><span class="n">Разминка-движение</span><span class="d">Как обычно, 8–10 мин</span></span></label><div class="how">Как в блоке «Разминка-движение» на вкладке «Неделя».</div></li>
+      <li><label><input type="checkbox" id="bl-2"><span><span class="n">4 ускорения по 20 м на 80%</span></span></label><div class="how">Стартуйте из стойки, разгоняйтесь плавно, на финише не напрягайтесь. <span class="links"><a href="https://www.youtube.com/results?search_query=acceleration+sprint+technique" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="bl-3"><span><span class="n">Прыжки конькобежца 2×5 на сторону</span></span></label><div class="how">Приземляйтесь мягко на согнутую ногу и фиксируйтесь на 2 с. <span class="links"><a href="https://www.youtube.com/results?search_query=skater+jumps+stick+landing" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="bl-4"><span><span class="n">Махи гирей 2×10</span></span></label><div class="how">Гиря движется за счёт таза, спина ровная. <span class="links"><a href="https://www.youtube.com/results?search_query=kettlebell+swing+technique+hardstyle" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="bl-5"><span><span class="n">Мобильность 5 мин</span><span class="d">Из понедельничного комплекса</span></span></label><div class="how">Сделайте позу 90/90, растяжку сгибателей бедра и кошку-корову из понедельничного комплекса.</div></li>
+    </ul>
+    <div class="rowbtn"><button class="reset" data-reset="b">Сбросить отметки</button></div>
+  </div>
+</section>
 
-    function importBackup(file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const data = JSON.parse(reader.result);
-          if (!Array.isArray(data) || !data.length) throw new Error('empty');
-          games = data;
-          currentId = games[0].id;
-          save();
-          renderGameSelect();
-          applyGame(currentGame());
-          alert('Загружено игр: ' + games.length);
-        } catch (_) {
-          alert('Не удалось прочитать файл. Нужен .json из «Скачать копию».');
-        }
-      };
-      reader.readAsText(file, 'utf-8');
-    }
+<!-- C -->
+<section id="c" role="tabpanel" hidden>
+  <h2>В · Выносливость</h2>
+  <div class="switch">
+    <span>Версия</span>
+    <div class="seg" role="group" aria-label="Версия тренировки В">
+      <button type="button" data-game="sun" id="c-sun">Полная (Сб)</button>
+      <button type="button" data-game="sat" id="c-sat">Лёгкая (Вс)</button>
+    </div>
+  </div>
+  <div data-when="sun" style="display:grid;gap:16px">
+    <div class="block">
+      <h3>Беговой блок, чередуйте по неделям</h3>
+      <div class="switch">
+        <span>Эта неделя</span>
+        <div class="seg" role="group" aria-label="Интервалы">
+          <button type="button" data-int="400" id="i-400">4×400</button>
+          <button type="button" data-int="800" id="i-800">3×800</button>
+        </div>
+      </div>
+      <ul class="ex">
+        <li data-int-when="400"><label><input type="checkbox" id="c-r4"><span><span class="n">4×400 м</span><span class="d">Отдых 90 с шагом</span></span></label><div class="how">Держите одинаковый темп на всех отрезках: последний не должен быть медленнее первого.</div></li>
+        <li data-int-when="800"><label><input type="checkbox" id="c-r8"><span><span class="n">3×800 м</span><span class="d">Отдых 2 мин</span></span></label><div class="how">Держите одинаковый темп на всех отрезках: последний не должен быть медленнее первого.</div></li>
+      </ul>
+      <div class="pace">
+        <div><b>5:42</b><span>ваш темп 10 км, мин/км</span></div>
+        <div><b>1:55–2:05</b><span>400 м</span></div>
+        <div><b>4:05–4:20</b><span>800 м</span></div>
+      </div>
+      <p class="note">По ощущениям 8 из 10: тяжело, но ровно. Первую тренировку считайте тестом и подстройте темп.</p>
+    </div>
+    <div class="block">
+      <h3>Круговая × 3, почти без отдыха</h3>
+      <ul class="ex">
+        <li><label><input type="checkbox" id="c-1"><span><span class="n">Гоблет-присед с гирей</span><span class="d">12 раз</span></span></label><div class="how">Держите гирю у груди за рожки, локти смотрят вниз. Садитесь между пяток до параллели, колени идут по направлению носков. <span class="links"><a href="https://www.youtube.com/results?search_query=goblet+squat+kettlebell" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+        <li><label><input type="checkbox" id="c-2"><span><span class="n">Жимовой толчок гирей</span><span class="d">8 на руку</span></span></label><div class="how">Гиря лежит на плече. Сделайте короткий подсед и толчком ног вытолкните гирю вверх. Вверху зафиксируйте прямую руку. <span class="links"><a href="https://www.youtube.com/results?search_query=kettlebell+push+press" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+        <li><label><input type="checkbox" id="c-3"><span><span class="n">Тяга диска одной рукой в наклоне</span><span class="d">10 на руку</span></span></label><div class="how">Обопритесь рукой и коленом о скамейку, спина ровная. Тяните диск к поясу, локоть идёт вдоль корпуса, не скручивайтесь. <span class="links"><a href="https://www.youtube.com/results?search_query=single+arm+row+bench" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+        <li><label><input type="checkbox" id="c-4"><span><span class="n">Обратные выпады с диском у груди</span><span class="d">8 на ногу</span></span></label><div class="how">Прижмите диск к груди. Шагните назад, опуститесь почти до касания коленом и поднимитесь толчком передней пятки. <span class="links"><a href="https://darebee.com/exercises/reverse-lunges.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+        <li><label><input type="checkbox" id="c-5"><span><span class="n">Боковая планка</span><span class="d">30 с на сторону</span></span></label><div class="how">Локоть под плечом, тело на одной линии от головы до стоп, таз не провисает. <span class="links"><a href="https://darebee.com/exercises/side-planks.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+      </ul>
+      <div class="rowbtn"><button class="reset" data-reset="c">Сбросить отметки</button></div>
+    </div>
+  </div>
+  <div class="block" data-when="sat">
+    <p class="note">Вчера была игра. Без интервалов и тяжёлых ног.</p>
+    <ul class="ex">
+      <li><label><input type="checkbox" id="cl-1"><span><span class="n">Ровный бег 20–25 мин</span><span class="d">Можно с гантелями 1,5 кг, темп разговорный</span></span></label><div class="how">Бегите в темпе, при котором можно говорить фразами. Это примерно 2-я пульсовая зона на Garmin.</div></li>
+      <li><label><input type="checkbox" id="cl-2"><span><span class="n">Подтягивания 3×5–6</span></span></label><div class="how">Опустите лопатки и тяните грудь к перекладине, не раскачиваясь. <span class="links"><a href="https://darebee.com/pullups-guide.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="cl-3"><span><span class="n">Отжимания 3×10–12</span></span></label><div class="how">Тело на одной линии, локти под углом около 45° к корпусу, грудь опускается почти до земли. <span class="links"><a href="https://darebee.com/pushups-guide.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="cl-4"><span><span class="n">Тяга диска одной рукой 3×10</span></span></label><div class="how">Тяните к поясу, локоть идёт вдоль корпуса. <span class="links"><a href="https://www.youtube.com/results?search_query=single+arm+row+bench" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="cl-5"><span><span class="n">Боковая планка и «птица-собака»</span><span class="d">По 2×30 с</span></span></label><div class="how">«Птица-собака»: на четвереньках вытяните противоположные руку и ногу. Спина ровная. <span class="links"><a href="https://darebee.com/exercises/side-planks.html" target="_blank" rel="noopener">Darebee ↗</a> <a href="https://www.youtube.com/results?search_query=bird+dog+exercise+mcgill" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+    </ul>
+    <div class="rowbtn"><button class="reset" data-reset="c">Сбросить отметки</button></div>
+  </div>
+  <p class="note">Гантели 1,5 кг подходят для лёгкого бега. На интервалы и спринты их не берите: они ломают технику.</p>
+</section>
 
-    document.getElementById('btnParse').addEventListener('click', () => {
-      const text = document.getElementById('pasteArea').value;
-      const parsed = parseTelegramList(text);
-      const g = currentGame();
-      g.players = parsed.slice(0, MAX_PLAYERS);
-      g.players.push(emptyPlayer());
-      save();
-      renderPlayers(g);
-      updateDashboard();
-    });
+<!-- MOB -->
+<section id="mob" role="tabpanel" hidden>
+  <h2>Понедельник вечером</h2>
+  <div class="meta"><span class="chip">15–20 мин</span><span class="chip">По 1–2 мин на упражнение</span></div>
+  <div class="block">
+    <ul class="ex">
+      <li><label><input type="checkbox" id="m-1"><span><span class="n">Поза 90/90</span><span class="d">Тазобедренные, обе стороны</span></span></label><div class="how">Сядьте, обе ноги согнуты под 90°: одна впереди, другая сбоку. С прямой спиной наклонитесь к передней голени, затем без помощи рук смените сторону. <span class="links"><a href="https://www.youtube.com/results?search_query=90+90+hip+stretch" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-2"><span><span class="n">Покачивания назад на четвереньках, нога в сторону</span><span class="d">Растяжка приводящих (пах)</span></span></label><div class="how">Встаньте на четвереньки, одну ногу выпрямите в сторону. Плавно отводите таз к пяткам, пока не потянет внутреннюю сторону бедра. <span class="links"><a href="https://www.youtube.com/results?search_query=adductor+rock+back+stretch" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-3"><span><span class="n">Растяжка сгибателей бедра у стены</span><span class="d">У хоккеистов они зажаты, отсюда часто болит поясница</span></span></label><div class="how">Встаньте в полувыпад, заднее колено на полу. Подкрутите таз, напрягите ягодицу и слегка подайтесь вперёд. Тянуть должно спереди бедра, а не в пояснице. <span class="links"><a href="https://www.youtube.com/results?search_query=half+kneeling+hip+flexor+stretch" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-4"><span><span class="n">Кошка-корова</span></span></label><div class="how">Встаньте на четвереньки. На вдохе прогнитесь, на выдохе округлите спину. Двигайтесь медленно. <span class="links"><a href="https://www.youtube.com/results?search_query=cat+cow+stretch" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-5"><span><span class="n">Ротации грудного отдела</span><span class="d">Лёжа на боку, «открыть книгу»</span></span></label><div class="how">Лягте на бок, колени согнуты, руки вытянуты вперёд. Раскройте верхнюю руку дугой назад и следите за ней взглядом. Колени остаются на месте. <span class="links"><a href="https://www.youtube.com/results?search_query=open+book+thoracic+rotation" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-6"><span><span class="n">Скручивание Макгилла</span><span class="d">3×10 с</span></span></label><div class="how">Лягте на спину, одну ногу согните, ладони положите под поясницу. Приподнимите голову и плечи на пару сантиметров. Шею не сгибайте. <span class="links"><a href="https://www.youtube.com/results?search_query=mcgill+curl+up" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-7"><span><span class="n">Боковая планка</span><span class="d">3×10 с на сторону</span></span></label><div class="how">Локоть под плечом, тело на одной линии, таз не провисает. <span class="links"><a href="https://darebee.com/exercises/side-planks.html" target="_blank" rel="noopener">Darebee ↗</a></span></div></li>
+      <li><label><input type="checkbox" id="m-8"><span><span class="n">«Птица-собака»</span><span class="d">3×10 с на сторону</span></span></label><div class="how">Вытяните противоположные руку и ногу и задержитесь на 10 с. Таз не заваливается. <span class="links"><a href="https://www.youtube.com/results?search_query=bird+dog+exercise+mcgill" target="_blank" rel="noopener">Видео ↗</a></span></div></li>
+    </ul>
+    <div class="rowbtn"><button class="reset" data-reset="mob">Сбросить отметки</button></div>
+  </div>
+</section>
 
-    document.getElementById('btnNewGame').addEventListener('click', () => {
-      persistCurrentGame();
-      const ng = newGameData();
-      games.unshift(ng);
-      currentId = ng.id;
-      save();
-      renderGameSelect();
-      applyGame(ng);
-      document.getElementById('pasteArea').value = '';
-    });
+<!-- READY -->
+<section id="ready" role="tabpanel" hidden>
+  <h2>Светофор готовности</h2>
+  <p class="note">Восстановление 16–36 ч после хоккея — это нормально. Оно не запрещает тренироваться, а говорит, что сейчас не время для максимума. Утром смотрите на сон, Training Readiness и самочувствие.</p>
+  <div class="light g"><i></i><div><strong>Готовность 50+, сон от 6,5 ч, ничего не болит</strong>Делаете по плану.</div></div>
+  <div class="light y"><i></i><div><strong>Готовность 25–49 или сон меньше 6 ч</strong>Минус один круг, без спринтов и прыжков, вес оставляете.</div></div>
+  <div class="light r"><i></i><div><strong>Готовность ниже 25, сон меньше 5 ч, тянет пах или поясницу</strong>25 мин лёгкой трусцы или ходьбы плюс понедельничная мобильность.</div></div>
+  <div class="block"><p><b>Правило паха:</b> если резко потянуло, сразу останавливайтесь. Не дотягивайте подход.</p></div>
+</section>
 
-    document.getElementById('btnDeleteGame').addEventListener('click', () => {
-      if (games.length <= 1) { alert('Нельзя удалить единственную игру'); return; }
-      if (!confirm('Удалить эту игру?')) return;
-      persistCurrentGame();
-      games = games.filter(g => g.id !== currentId);
-      currentId = games[0].id;
-      save();
-      renderGameSelect();
-      applyGame(games[0]);
-    });
+<!-- FOOD -->
+<section id="food" role="tabpanel" hidden>
+  <h2>Питание</h2>
+  <div class="meta"><span class="chip">182 см · 79 кг</span><span class="chip">Цель: держать вес</span></div>
+  <div class="pace">
+    <div><b>~2800</b><span>ккал в среднем за день</span></div>
+    <div><b>125–140 г</b><span>белка в день</span></div>
+    <div><b>4 × 30–35 г</b><span>белка за приём</span></div>
+  </div>
+  <div class="block">
+    <h3>Углеводы и жиры по дням</h3>
+    <ul class="plain">
+      <li><b>Игра или тренировка:</b> углеводы 320–400 г (4–5 г/кг).</li>
+      <li><b>Понедельник, без нагрузки:</b> углеводы около 240 г (3 г/кг).</li>
+      <li><b>Жиры каждый день:</b> 65–80 г.</li>
+    </ul>
+    <p class="note">Ориентир, а не норма. Если вес 2 недели подряд уходит вниз или вверх больше чем на 1 кг, прибавьте или уберите около 200 ккал, в основном за счёт углеводов.</p>
+  </div>
+  <div class="block">
+    <h3>30–35 г белка — это</h3>
+    <ul class="plain">
+      <li>150 г куриной грудки, индейки или говядины</li>
+      <li>170 г рыбы</li>
+      <li>5 яиц или 3 яйца и 100 г творога</li>
+      <li>200 г творога 5%</li>
+      <li>1,5 мерной ложки протеина</li>
+    </ul>
+  </div>
+  <div class="block">
+    <h3>Игровой день (игра в 20:30)</h3>
+    <ul class="plain">
+      <li><b>13:00</b> Обычный обед.</li>
+      <li><b>17:00</b> Главный приём пищи: крупа или паста и курица или рыба, жирного немного.</li>
+      <li><b>19:30</b> Банан или хлеб с мёдом.</li>
+      <li><b>Игра</b> Вода. Если сильно потеете, добавьте щепотку соли или электролиты.</li>
+      <li><b>23:00</b> Белок и углеводы: омлет с хлебом, курица с рисом, творог с бананом. Порция умеренная, без жареного.</li>
+    </ul>
+    <p class="note">Взвесьтесь до и после игры. На каждый потерянный килограмм выпейте 1,2–1,5 л воды до утра.</p>
+  </div>
+  <div class="block">
+    <h3>Утренние тренировки</h3>
+    <p>До тренировки: вода и, по желанию, полбанана. После: завтрак с белком 30–35 г, например яйца, каша или творог.</p>
+  </div>
+  <div class="block">
+    <h3>Добавки</h3>
+    <ul class="plain">
+      <li><b>Креатин моногидрат, 3–5 г в день.</b> Принимайте каждый день, без загрузки. Вес может прибавиться на 1–2 кг за счёт воды.</li>
+      <li><b>Протеин</b> — если не добираете белок едой. Если от молока бывает дискомфорт, берите изолят или растительный.</li>
+      <li><b>Витамин D</b> — сначала анализ на 25(OH)D, дозу подбирайте с врачом.</li>
+      <li><b>Омега-3</b> — если рыба реже 2 раз в неделю.</li>
+      <li><b>Магний</b> на ночь — по желанию.</li>
+    </ul>
+    <p class="note">Не нужны: BCAA, глютамин, «жиросжигатели», «бустеры». Кофеин перед вечерней игрой ухудшит сон. Перед началом добавок сдайте анализы (креатинин, витамин D) и покажите терапевту.</p>
+  </div>
+  <div class="block">
+    <h3>Вечер после игры</h3>
+    <ul class="plain">
+      <li>Еда в течение часа, вода по весу.</li>
+      <li>Тёплый душ и 5 мин лёгкой растяжки.</li>
+      <li>Приглушённый свет, телефон отложить.</li>
+      <li>Пиво после игры — 1 бутылка максимум и с водой: алкоголь сильно режет сон и восстановление.</li>
+      <li>Ледяную ванну можно после игры, но не после силовой в среду.</li>
+    </ul>
+  </div>
+  <div class="block">
+    <h3>Сон</h3>
+    <p>Главный рычаг. В дни без игр (Пн, Ср, Пт) ложитесь так, чтобы спать 7,5 ч.</p>
+  </div>
+</section>
+</div>
 
-    document.getElementById('gameSelect').addEventListener('change', e => {
-      const nextId = e.target.value;
-      persistCurrentGame();
-      currentId = nextId;
-      renderGameSelect();
-      applyGame(currentGame());
-    });
+<div class="timer" role="region" aria-label="Таймер отдыха">
+  <div class="in">
+    <div class="top"><span class="clock" id="clock" aria-live="polite">0:00</span></div>
+    <div class="tbtns">
+      <button type="button" data-sec="60" id="tm-60">60<small>сек</small></button>
+      <button type="button" data-sec="90" id="tm-90">90<small>сек</small></button>
+      <button type="button" data-sec="120" id="tm-120">2:00<small>мин</small></button>
+      <button type="button" class="stop" id="tm-stop">Стоп</button>
+    </div>
+  </div>
+</div>
 
-    document.getElementById('btnPrint').addEventListener('click', printGameReport);
-    document.getElementById('btnTelegram').addEventListener('click', copyTelegram);
-    document.getElementById('btnPrintCopy').addEventListener('click', printGameReport);
-    document.getElementById('btnTelegramCopy').addEventListener('click', copyTelegram);
+<script>
+(function(){
+  const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+  const tabs=[...document.querySelectorAll('.tab')];
+  const panels=[...document.querySelectorAll('section[role=tabpanel]')];
+  function show(id,push){
+    if(!document.getElementById(id))id='week';
+    tabs.forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===id?'true':'false'));
+    panels.forEach(p=>p.hidden=p.id!==id);
+    store.set('hp-tab',id);
+    const t=tabs.find(t=>t.dataset.tab===id); if(t)t.scrollIntoView({block:'nearest',inline:'nearest'});
+    if(push)window.scrollTo(0,0);
+  }
+  tabs.forEach(t=>t.addEventListener('click',()=>show(t.dataset.tab,true)));
+  document.querySelectorAll('[data-jump]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.jump,true)));
+  const hash=(location.hash||'').slice(1);
+  show(hash&&document.getElementById(hash)?hash:store.get('hp-tab','week'));
 
-    document.getElementById('btnExport').addEventListener('click', exportBackup);
+  // game day
+  function setGame(g){
+    document.querySelectorAll('[data-game]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.game===g?'true':'false'));
+    document.querySelectorAll('[data-when]').forEach(el=>el.hidden=el.dataset.when!==g);
+    store.set('hp-game',g);
+  }
+  document.querySelectorAll('[data-game]').forEach(b=>b.addEventListener('click',()=>setGame(b.dataset.game)));
+  setGame(store.get('hp-game','sun'));
 
-    document.getElementById('btnImport').addEventListener('click', () => {
-      document.getElementById('importFile').click();
-    });
+  function setInt(n){
+    document.querySelectorAll('[data-int]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.int===n?'true':'false'));
+    document.querySelectorAll('[data-int-when]').forEach(el=>el.hidden=el.dataset.intWhen!==n);
+    store.set('hp-int',n);
+  }
+  document.querySelectorAll('[data-int]').forEach(b=>b.addEventListener('click',()=>setInt(b.dataset.int)));
+  setInt(store.get('hp-int','400'));
 
-    document.getElementById('importFile').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) importBackup(file);
-      e.target.value = '';
-    });
+  // checkboxes
+  const checks=store.get('hp-checks',{});
+  document.querySelectorAll('.ex input[type=checkbox]').forEach(cb=>{
+    cb.checked=!!checks[cb.id];
+    cb.addEventListener('change',()=>{checks[cb.id]=cb.checked;store.set('hp-checks',checks)});
+  });
+  document.querySelectorAll('[data-reset]').forEach(b=>b.addEventListener('click',()=>{
+    document.getElementById(b.dataset.reset).querySelectorAll('input[type=checkbox]').forEach(cb=>{cb.checked=false;checks[cb.id]=false});
+    store.set('hp-checks',checks);
+  }));
 
-    bindParams();
-    load();
-  </script>
-</body>
-</html>
+  // timer
+  const clock=document.getElementById('clock');
+  let end=0,iv=null,ac=null,lock=null;
+  function fmt(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+  function beep(){try{if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.2;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.6)}catch(e){}}
+  function tick(){
+    const left=Math.max(0,Math.ceil((end-Date.now())/1000));
+    clock.textContent=fmt(left);
+    if(left===0){clearInterval(iv);iv=null;clock.classList.add('done');document.querySelectorAll('[data-sec]').forEach(x=>x.classList.remove('on'));beep();try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}
+  }
+  document.querySelectorAll('[data-sec]').forEach(b=>b.addEventListener('click',()=>{
+    try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume&&ac.resume()}catch(e){}
+    try{if('wakeLock' in navigator&&!lock)navigator.wakeLock.request('screen').then(l=>{lock=l;l.addEventListener('release',()=>lock=null)}).catch(()=>{})}catch(e){}
+    end=Date.now()+(+b.dataset.sec)*1000;clock.classList.remove('done');document.querySelectorAll('[data-sec]').forEach(x=>x.classList.toggle('on',x===b));
+    clearInterval(iv);iv=setInterval(tick,250);tick();
+  }));
+  document.getElementById('tm-stop').addEventListener('click',()=>{clearInterval(iv);iv=null;clock.textContent='0:00';clock.classList.remove('done');document.querySelectorAll('[data-sec]').forEach(x=>x.classList.remove('on'))});
+})();
+</script>
+
+</body></html>
